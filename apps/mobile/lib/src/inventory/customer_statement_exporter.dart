@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 
-import 'package:cross_file/cross_file.dart';
 import 'package:excel/excel.dart';
 import 'package:pdf/pdf.dart' as pdf;
 import 'package:pdf/widgets.dart' as pw;
@@ -71,7 +70,7 @@ class CustomerStatementReport {
           date: receipt.receivedAt,
           title: 'دریافت فاکتور ${receipt.saleNumber}',
           description: '${_paymentLabel(receipt.paymentMethod)}'
-              '${receipt.reference == null ? '' : ' • ${receipt.reference}'},
+              '${receipt.reference == null ? '' : ' • ${receipt.reference}'}',
           amount: receipt.amount,
           isReceipt: true,
         ),
