@@ -288,9 +288,12 @@ begin
     tg_table_name, v_entity_id, tg_op, v_before, v_after
   );
 
-  return case when tg_op = 'DELETE' then old else new end;
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
 end;
-$$;
+$;
 
 revoke all on function private.log_authorization_change() from public, anon, authenticated;
 
