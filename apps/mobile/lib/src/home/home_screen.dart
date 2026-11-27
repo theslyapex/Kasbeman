@@ -197,7 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   DropdownButtonFormField<String>(
-                                    value: selected.id,
+                                    initialValue: selected.id,
                                     isExpanded: true,
                                     decoration: const InputDecoration(
                                       prefixIcon:
