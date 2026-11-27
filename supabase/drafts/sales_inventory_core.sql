@@ -79,6 +79,55 @@ create unique index warehouses_one_default_per_branch_idx
 create index warehouses_branch_status_idx
   on public.warehouses (business_id, branch_id, status);
 
+-- Every active branch receives a default warehouse. The trigger also covers
+-- branches created after this schema is installed.
+insert into public.warehouses
+  (business_id, branch_id, name, code, is_default, created_by)
+select
+  br.business_id,
+  br.id,
+  'انبار اصلی',
+  'WH-' || upper(substr(replace(br.id::text, '-', ''), 1, 16)),
+  true,
+  b.created_by
+from public.branches br
+join public.businesses b on b.id = br.business_id
+where br.status = 'active';
+
+create or replace function private.create_default_warehouse_for_branch()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_created_by uuid;
+begin
+  if new.status = 'active' then
+    select b.created_by into v_created_by
+    from public.businesses b
+    where b.id = new.business_id;
+
+    insert into public.warehouses
+      (business_id, branch_id, name, code, is_default, created_by)
+    values (
+      new.business_id,
+      new.id,
+      'انبار اصلی',
+      'WH-' || upper(substr(replace(new.id::text, '-', ''), 1, 16)),
+      true,
+      v_created_by
+    );
+  end if;
+  return new;
+end;
+$;
+
+revoke all on function private.create_default_warehouse_for_branch() from public, anon, authenticated;
+create trigger branch_create_default_warehouse
+  after insert on public.branches
+  for each row execute function private.create_default_warehouse_for_branch();
+
 create table public.stock_balances (
   business_id uuid not null,
   branch_id uuid not null,
