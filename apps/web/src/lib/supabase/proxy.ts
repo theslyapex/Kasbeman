@@ -33,6 +33,7 @@ export async function updateSupabaseSession(request: NextRequest) {
   // Refresh and validate the session before downstream server rendering.
   // Authorization decisions must still be enforced by RLS and domain services.
   await supabase.auth.getClaims();
+  response.headers.set("Cache-Control", "private, no-store");
 
   return response;
 }
