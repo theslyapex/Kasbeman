@@ -51,6 +51,8 @@ void main() {
         reference: null,
         notes: null,
         receivedAt: DateTime(2026, 1, 10),
+        reversedAt: DateTime(2026, 1, 15),
+        reversalReason: 'اشتباه در ثبت',
       ),
       CustomerReceiptRecord(
         id: 'receipt-period',
@@ -71,10 +73,10 @@ void main() {
       receipts: receipts,
     );
 
-    expect(report.openingBalance, 800);
+    expect(report.openingBalance, 1000);
     expect(report.totalDebit, 500);
     expect(report.totalCredit, 100);
-    expect(report.closingBalance, 1200);
+    expect(report.closingBalance, 1400);
     expect(report.rows, hasLength(2));
   });
 }

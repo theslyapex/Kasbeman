@@ -69,15 +69,25 @@ class CustomerStatementReport {
           amount: sale.grandTotal,
           isReceipt: false,
         ),
-      for (final receipt in receipts)
+      for (final receipt in receipts) ...[
         _StatementEvent(
           date: receipt.receivedAt,
           title: 'دریافت فاکتور ${receipt.saleNumber}',
           description: '${_paymentLabel(receipt.paymentMethod)}'
-              '${receipt.reference == null ? '' : ' • ${receipt.reference}'}',
+              '${receipt.reference == null ? '' : ' • ${receipt.reference}'}'
+              '${receipt.isReversed ? ' • برگشت‌شده' : ''}',
           amount: receipt.amount,
           isReceipt: true,
         ),
+        if (receipt.isReversed)
+          _StatementEvent(
+            date: receipt.reversedAt!,
+            title: 'برگشت دریافت فاکتور ${receipt.saleNumber}',
+            description: receipt.reversalReason ?? 'اصلاح دریافت',
+            amount: receipt.amount,
+            isReceipt: false,
+          ),
+      ],
     ]..sort((a, b) {
         final byDate = a.date.compareTo(b.date);
         if (byDate != 0) return byDate;

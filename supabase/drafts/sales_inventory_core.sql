@@ -812,6 +812,7 @@ grant execute on function public.confirm_sale(uuid) to authenticated;
 
 alter table public.customers enable row level security;
 alter table public.customer_receipts enable row level security;
+alter table public.customer_receipt_reversals enable row level security;
 alter table public.products enable row level security;
 alter table public.warehouses enable row level security;
 alter table public.stock_balances enable row level security;

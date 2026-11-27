@@ -241,6 +241,8 @@ class CustomerReceiptRecord {
     required this.reference,
     required this.notes,
     required this.receivedAt,
+    this.reversedAt,
+    this.reversalReason,
   });
 
   final String id;
@@ -250,10 +252,19 @@ class CustomerReceiptRecord {
   final String? reference;
   final String? notes;
   final DateTime receivedAt;
+  final DateTime? reversedAt;
+  final String? reversalReason;
+  bool get isReversed => reversedAt != null;
 
   factory CustomerReceiptRecord.fromJson(Map<String, dynamic> json) {
     final rawSale = json['sale'];
     final sale = rawSale is Map ? Map<String, dynamic>.from(rawSale) : null;
+    final rawReversal = json['reversal'];
+    final reversal = rawReversal is Map
+        ? Map<String, dynamic>.from(rawReversal)
+        : rawReversal is List && rawReversal.isNotEmpty
+            ? Map<String, dynamic>.from(rawReversal.first as Map)
+            : null;
     return CustomerReceiptRecord(
       id: json['id'] as String,
       saleNumber: sale?['sale_number'] as String? ?? 'فاکتور',
@@ -262,6 +273,8 @@ class CustomerReceiptRecord {
       reference: json['reference'] as String?,
       notes: json['notes'] as String?,
       receivedAt: DateTime.parse(json['received_at'] as String),
+      reversedAt: reversal == null ? null : DateTime.parse(reversal['reversed_at'] as String),
+      reversalReason: reversal?['reason'] as String?,
     );
   }
 }
@@ -342,6 +355,10 @@ abstract interface class InventoryRepository {
     String? notes,
   });
 
+  Future<String> reverseCustomerReceipt({
+    required String receiptId,
+    required String reason,
+  });
   Future<void> updateCustomer({
     required String businessId,
     required String customerId,
@@ -522,7 +539,8 @@ class SupabaseInventoryRepository implements InventoryRepository {
       final page = await _client.from('customer_receipts')
           .select(
             'id,amount,payment_method,reference,notes,received_at,'
-            'sale:sales!customer_receipts_sale_customer_fkey(sale_number)',
+            'sale:sales!customer_receipts_sale_customer_fkey(sale_number),'
+            'reversal:customer_receipt_reversals(id,reversed_at,reason)',
           )
           .eq('business_id', businessId)
           .eq('customer_id', customerId)
@@ -558,6 +576,20 @@ class SupabaseInventoryRepository implements InventoryRepository {
     return result;
   }
 
+  @override
+  Future<String> reverseCustomerReceipt({
+    required String receiptId,
+    required String reason,
+  }) async {
+    final result = await _client.rpc('reverse_customer_receipt', params: {
+      'p_receipt_id': receiptId,
+      'p_reason': reason.trim(),
+    });
+    if (result is! String || result.isEmpty) {
+      throw const FormatException('Unexpected receipt reversal identifier.');
+    }
+    return result;
+  }
   @override
   Future<void> updateCustomer({
     required String businessId,
