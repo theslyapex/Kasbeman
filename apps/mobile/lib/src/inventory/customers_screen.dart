@@ -69,8 +69,19 @@ class _CustomersScreenState extends State<CustomersScreen> {
             amount: receipt.amount,
             title: 'دریافت از فاکتور ${receipt.saleNumber}',
             subtitle: '${_paymentMethodLabel(receipt.paymentMethod)}'
-                '${receipt.reference == null ? '' : ' • ${receipt.reference}'}',
+                '${receipt.reference == null ? '' : ' • ${receipt.reference}'}'
+                '${receipt.isReversed ? ' • برگشت‌شده' : ''}',
             isReceipt: true,
+            receiptId: receipt.id,
+            isReversed: receipt.isReversed,
+          ),
+        for (final receipt in receipts.where((item) => item.isReversed))
+          _CustomerLedgerEntry(
+            date: receipt.reversedAt!,
+            amount: receipt.amount,
+            title: 'برگشت دریافت فاکتور ${receipt.saleNumber}',
+            subtitle: receipt.reversalReason ?? 'اصلاح دریافت',
+            isReceipt: false,
           ),
       ];
       entries.sort((a, b) => b.date.compareTo(a.date));
@@ -207,6 +218,53 @@ class _CustomersScreenState extends State<CustomersScreen> {
     }
   }
 
+  Future<void> _reverseReceipt(CustomerRecord customer, _CustomerLedgerEntry entry) async {
+    final reasonController = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('برگشت دریافت وجه'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('این عملیات یک سند معکوس ثبت می‌کند؛ رسید اصلی حذف یا ویرایش نمی‌شود.'),
+            const SizedBox(height: 12),
+            TextField(controller: reasonController, autofocus: true, minLines: 2, maxLines: 4, maxLength: 500,
+              decoration: const InputDecoration(labelText: 'علت برگشت (الزامی)')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('انصراف')),
+          FilledButton(
+            onPressed: () {
+              final value = reasonController.text.trim();
+              if (value.length >= 3) Navigator.pop(dialogContext, value);
+            },
+            child: const Text('ثبت برگشت'),
+          ),
+        ],
+      ),
+    );
+    reasonController.dispose();
+    if (reason == null || entry.receiptId == null) return;
+    try {
+      await widget.repository.reverseCustomerReceipt(receiptId: entry.receiptId!, reason: reason);
+      if (!mounted) return;
+      _ledgerHistory.remove(customer.id);
+      setState(_load);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سند برگشت دریافت ثبت شد.')));
+    } on PostgrestException catch (error) {
+      if (!mounted) return;
+      final message = error.code == '23505'
+          ? 'این رسید قبلاً برگشت خورده است.'
+          : error.code == '42501' ? 'مجوز برگشت دریافت را نداری.' : 'ثبت برگشت دریافت انجام نشد.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ارتباط با سرور برقرار نشد.')));
+    }
+  }
   Future<void> _exportStatement(CustomerRecord customer) async {
     final now = DateTime.now();
     final range = await showDateRangePicker(
@@ -641,15 +699,20 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                         ),
-                                        trailing: Text(
-                                          '${entry.isReceipt ? '−' : '+'}${_money(entry.amount)}',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            color: entry.isReceipt
-                                                ? const Color(0xFF5AD6A0)
-                                                : const Color(0xFF00D8E8),
+                                        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                                          Text(
+                                            '${entry.isReceipt ? '−' : '+'}${_money(entry.amount)}',
+                                            style: TextStyle(fontWeight: FontWeight.w800, color: entry.isReceipt
+                                              ? const Color(0xFF5AD6A0) : const Color(0xFF00D8E8)),
                                           ),
-                                        ),
+                                          if (entry.isReceipt && !entry.isReversed && entry.receiptId != null)
+                                            IconButton(
+                                              tooltip: 'برگشت دریافت',
+                                              visualDensity: VisualDensity.compact,
+                                              onPressed: () => _reverseReceipt(customer, entry),
+                                              icon: const Icon(Icons.undo_rounded, color: Color(0xFFFFB45C), size: 19),
+                                            ),
+                                        ]),
                                       )),
                                     ],
                                   );
@@ -745,6 +808,8 @@ class _CustomerLedgerEntry {
     required this.title,
     required this.subtitle,
     required this.isReceipt,
+    this.receiptId,
+    this.isReversed = false,
   });
 
   final DateTime date;
@@ -752,6 +817,8 @@ class _CustomerLedgerEntry {
   final String title;
   final String subtitle;
   final bool isReceipt;
+  final String? receiptId;
+  final bool isReversed;
 }
 class _CustomerForm extends StatefulWidget {
   const _CustomerForm({
