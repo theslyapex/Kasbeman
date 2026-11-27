@@ -3,7 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'src/auth/auth_screen.dart';
-import 'src/home/home_screen.dart';
+import 'src/workspace/workspace_screen.dart';
 
 const _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const _supabasePublishableKey =
@@ -109,7 +109,7 @@ class _AuthGate extends StatelessWidget {
       builder: (context, snapshot) {
         final session = snapshot.data?.session ?? auth.currentSession;
         if (session == null) return const AuthScreen();
-        return HomeScreen(email: session.user.email ?? '');
+        return WorkspaceScreen(email: session.user.email ?? '');
       },
     );
   }
