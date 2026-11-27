@@ -2,7 +2,8 @@
 
 INSERT INTO auth.users (id, raw_user_meta_data) VALUES
   ('10000000-0000-4000-8000-000000000001', '{"full_name":"Kasbeman Test Owner"}'),
-  ('10000000-0000-4000-8000-000000000002', '{"full_name":"Kasbeman Test Branch Member"}');
+  ('10000000-0000-4000-8000-000000000002', '{"full_name":"Kasbeman Test Branch Member"}'),
+  ('10000000-0000-4000-8000-000000000003', '{"full_name":"Kasbeman Test Unrelated User"}');
 
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
@@ -222,7 +223,7 @@ RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
 
-DO $$
+DO $
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.businesses WHERE slug = 'kasbeman-ci-tenant') THEN
     RAISE EXCEPTION 'Active tenant member cannot see the business';
@@ -231,7 +232,22 @@ BEGIN
     RAISE EXCEPTION 'Branch-only member can see customers without CRM permission';
   END IF;
 END
-$$;
+$;
 
 RESET ROLE;
-SELECT 'PostgreSQL 17: schema, sales, stock, receipts, reversals, insufficient-stock rollback, branch-scoped RBAC, read-only enforcement, and tenant isolation passed.' AS result;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000003';
+
+DO $
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.businesses WHERE slug = 'kasbeman-ci-tenant') THEN
+    RAISE EXCEPTION 'Unrelated user can see another tenant business';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.customers WHERE name = 'مشتری آزمایشی') THEN
+    RAISE EXCEPTION 'Unrelated user can see another tenant customer';
+  END IF;
+END
+$;
+
+RESET ROLE;
+SELECT 'PostgreSQL 17: schema, sales, stock, receipts, reversals, insufficient-stock rollback, branch-scoped RBAC, read-only enforcement, and cross-tenant isolation passed.' AS result;

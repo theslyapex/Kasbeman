@@ -507,7 +507,7 @@ create trigger stock_movement_apply_balance
 
 -- Create a draft and all of its lines in one transaction. Prices are read
 -- from the current product records; clients cannot submit arbitrary unit prices.
-drop function if exists public.create_sale_draft(uuid, uuid, uuid, text, jsonb, text, text);
+drop function if exists public.create_sale_draft(uuid, uuid, uuid, text, jsonb, uuid, text, text);
 
 create or replace function public.create_sale_draft(
   p_business_id uuid,
