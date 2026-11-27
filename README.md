@@ -18,9 +18,11 @@ The mobile app must not duplicate business rules. Authorization, tenant isolatio
 
 ## Project status
 
-The web workspace includes the initial Supabase Auth flow (email/password signup, login, email confirmation callback), a protected workspace dashboard, and atomic business creation.
+The web workspace includes the initial Supabase Auth flow (email/password signup, login, email confirmation callback), a protected workspace dashboard, and business creation.
 
-The identity/tenancy and RBAC foundation migrations are applied to the hosted Supabase project. The first sales/inventory database design is being prepared as a review draft and has **not** been applied to production.
+The identity/tenancy foundation migration has been applied to the hosted Supabase project. The RBAC authorization migration exists in the repository but is **not confirmed as applied** to the hosted project. The sales/inventory database design remains a review draft and has **not** been applied to production.
+
+The current repository is a development scaffold, not a deployed product. See [the project roadmap and progress report](docs/PROJECT-ROADMAP.md) for phase status, separate web/mobile progress, CI status, and live-testing gates.
 
 ## Architecture principles
 
@@ -39,7 +41,7 @@ The identity/tenancy and RBAC foundation migrations are applied to the hosted Su
 - `apps/platform-admin`: separate platform control plane (reserved).
 - `packages/*`: shared TypeScript packages and API contracts for web-side tooling.
 - `supabase/*`: database migrations, seed data, functions, and tests.
-- `docs/*`: architecture, security, and deployment documentation.
+- `docs/*`: architecture, security, roadmap, and deployment documentation.
 
 Flutter and TypeScript do not share runtime code. They share backend contracts, API semantics, validation rules where practical, and documented domain behavior.
 
@@ -56,4 +58,4 @@ Do not put Supabase secret keys in browser-visible environment variables.
 
 ## Current limitations
 
-This is an initial scaffold, not a deployed product. Identity/tenancy and RBAC migrations are applied to the hosted Supabase project; sales/inventory schema is still under review. The web app still requires environment configuration and Supabase Auth redirect URL setup before live signup can be tested. Cloudflare account access is available, but no Kasbeman Worker or domain zone is configured yet. The Flutter app has an initial authenticated workspace, business selector, branch selector, and branch creation flow.
+The web app still requires environment configuration and Supabase Auth redirect URL setup before live signup can be tested. No Kasbeman Cloudflare deployment or domain zone is configured yet. The Flutter app has an initial authenticated workspace, business selector, branch selector, and branch creation flow. Sales/inventory operations still depend on the database design being reviewed and safely applied.
