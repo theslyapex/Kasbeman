@@ -29,6 +29,25 @@ class _FakeWorkspaceRepository implements WorkspaceRepository {
     );
     return 'business-created';
   }
+
+  @override
+  Future<List<BusinessBranch>> fetchBranches(String businessId) async => [
+        BusinessBranch(
+          id: 'branch-main',
+          businessId: businessId,
+          name: 'شعبه اصلی',
+          code: 'MAIN',
+          isPrimary: true,
+        ),
+      ];
+
+  @override
+  Future<String> createBranch({
+    required String businessId,
+    required String name,
+    String? code,
+  }) async =>
+      'branch-created';
 }
 
 void main() {
