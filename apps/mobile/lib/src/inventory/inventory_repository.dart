@@ -157,6 +157,75 @@ class InventoryMovement {
   }
 }
 
+class SaleRecord {
+  const SaleRecord({
+    required this.id,
+    required this.saleNumber,
+    required this.customerName,
+    required this.status,
+    required this.grandTotal,
+    required this.createdAt,
+    required this.confirmedAt,
+    required this.items,
+  });
+
+  final String id;
+  final String saleNumber;
+  final String? customerName;
+  final String status;
+  final num grandTotal;
+  final DateTime createdAt;
+  final DateTime? confirmedAt;
+  final List<SaleItemRecord> items;
+
+  factory SaleRecord.fromJson(Map<String, dynamic> json) {
+    final rawItems = (json['sale_items'] as List? ?? const []);
+    return SaleRecord(
+      id: json['id'] as String,
+      saleNumber: json['sale_number'] as String,
+      customerName: json['customer_name'] as String?,
+      status: json['status'] as String,
+      grandTotal: json['grand_total'] as num,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      confirmedAt: json['confirmed_at'] == null
+          ? null
+          : DateTime.parse(json['confirmed_at'] as String),
+      items: rawItems.map((item) => SaleItemRecord.fromJson(
+        Map<String, dynamic>.from(item as Map),
+      )).toList(growable: false),
+    );
+  }
+}
+
+class SaleItemRecord {
+  const SaleItemRecord({
+    required this.productName,
+    required this.quantity,
+    required this.unitPrice,
+    required this.discount,
+    required this.tax,
+    required this.lineTotal,
+  });
+
+  final String productName;
+  final num quantity;
+  final num unitPrice;
+  final num discount;
+  final num tax;
+  final num lineTotal;
+
+  factory SaleItemRecord.fromJson(Map<String, dynamic> json) {
+    return SaleItemRecord(
+      productName: json['product_name_snapshot'] as String,
+      quantity: json['quantity'] as num,
+      unitPrice: json['unit_price'] as num,
+      discount: json['discount_amount'] as num,
+      tax: json['tax_amount'] as num,
+      lineTotal: json['line_total'] as num,
+    );
+  }
+}
+
 abstract interface class InventoryRepository {
   Future<List<InventoryProduct>> fetchProducts(String businessId);
 
@@ -181,7 +250,7 @@ abstract interface class InventoryRepository {
     required String branchId,
   });
 
-  Future<String> createSaleDraft({
+  Future<List<SaleRecord>> fetchSales({\n    required String businessId,\n    required String branchId,\n    String? status,\n  });\n\n  Future<String> createSaleDraft({
     required String businessId,
     required String branchId,
     required String warehouseId,
@@ -316,6 +385,30 @@ class SupabaseInventoryRepository implements InventoryRepository {
               Map<String, dynamic>.from(row),
             ))
         .toList(growable: false);
+  }
+
+  @override
+  Future<List<SaleRecord>> fetchSales({
+    required String businessId,
+    required String branchId,
+    String? status,
+  }) async {
+    var query = _client
+        .from('sales')
+        .select(
+          'id,sale_number,customer_name,status,grand_total,created_at,confirmed_at,'
+          'sale_items!sale_items_sale_fkey(id,product_name_snapshot,quantity,'
+          'unit_price,discount_amount,tax_amount,line_total)',
+        )
+        .eq('business_id', businessId)
+        .eq('branch_id', branchId);
+    if (status != null && status != 'all') {
+      query = query.eq('status', status);
+    }
+    final rows = await query.order('created_at', ascending: false).limit(200);
+    return rows.map((row) => SaleRecord.fromJson(
+      Map<String, dynamic>.from(row),
+    )).toList(growable: false);
   }
 
   @override
