@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../home/home_screen.dart';
+import 'branch_selection_store.dart';
 import 'create_business_screen.dart';
 import 'workspace_repository.dart';
 
@@ -10,10 +11,12 @@ class WorkspaceScreen extends StatefulWidget {
     super.key,
     required this.email,
     this.repository,
+    this.branchSelectionStore,
   });
 
   final String email;
   final WorkspaceRepository? repository;
+  final BranchSelectionStore? branchSelectionStore;
 
   @override
   State<WorkspaceScreen> createState() => _WorkspaceScreenState();
@@ -70,6 +73,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           email: widget.email,
           membership: membership,
           repository: _repository,
+          branchSelectionStore: widget.branchSelectionStore,
           onSwitchWorkspace: () {
             navigator.pushReplacement(
               MaterialPageRoute<void>(
