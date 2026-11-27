@@ -113,6 +113,50 @@ class InventoryBalance {
   }
 }
 
+class InventoryMovement {
+  const InventoryMovement({
+    required this.id,
+    required this.productId,
+    required this.productName,
+    required this.unitName,
+    required this.movementType,
+    required this.quantity,
+    required this.fromWarehouseName,
+    required this.toWarehouseName,
+    required this.note,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String productId;
+  final String productName;
+  final String unitName;
+  final String movementType;
+  final num quantity;
+  final String? fromWarehouseName;
+  final String? toWarehouseName;
+  final String? note;
+  final DateTime createdAt;
+
+  factory InventoryMovement.fromJson(Map<String, dynamic> json) {
+    final product = Map<String, dynamic>.from(json['products'] as Map);
+    final from = json['from_warehouse'] as Map?;
+    final to = json['to_warehouse'] as Map?;
+    return InventoryMovement(
+      id: json['id'] as String,
+      productId: json['product_id'] as String,
+      productName: product['name'] as String,
+      unitName: product['unit_name'] as String,
+      movementType: json['movement_type'] as String,
+      quantity: json['quantity'] as num,
+      fromWarehouseName: from?['name'] as String?,
+      toWarehouseName: to?['name'] as String?,
+      note: json['note'] as String?,
+      createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+}
+
 abstract interface class InventoryRepository {
   Future<List<InventoryProduct>> fetchProducts(String businessId);
 
@@ -135,6 +179,12 @@ abstract interface class InventoryRepository {
   Future<List<InventoryBalance>> fetchBalances({
     required String businessId,
     required String branchId,
+  });
+
+  Future<List<InventoryMovement>> fetchMovements({
+    required String businessId,
+    required String branchId,
+    String? movementType,
   });
 
   Future<String> createMovement({
@@ -251,6 +301,35 @@ class SupabaseInventoryRepository implements InventoryRepository {
 
     return rows
         .map((row) => InventoryBalance.fromJson(
+              Map<String, dynamic>.from(row),
+            ))
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<InventoryMovement>> fetchMovements({
+    required String businessId,
+    required String branchId,
+    String? movementType,
+  }) async {
+    var query = _client
+        .from('stock_movements')
+        .select(
+          'id,product_id,movement_type,quantity,note,created_at,'
+          'products!stock_movements_product_fkey(name,unit_name),'
+          'from_warehouse:warehouses!stock_movements_from_warehouse_fkey(name),'
+          'to_warehouse:warehouses!stock_movements_to_warehouse_fkey(name)',
+        )
+        .eq('business_id', businessId)
+        .or('from_branch_id.eq.$branchId,to_branch_id.eq.$branchId');
+
+    if (movementType != null && movementType != 'all') {
+      query = query.eq('movement_type', movementType);
+    }
+
+    final rows = await query.order('created_at', ascending: false).limit(200);
+    return rows
+        .map((row) => InventoryMovement.fromJson(
               Map<String, dynamic>.from(row),
             ))
         .toList(growable: false);
