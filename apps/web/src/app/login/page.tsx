@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type LoginPageProps = { searchParams: Promise<{ error?: string }> };
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "ورود" };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
