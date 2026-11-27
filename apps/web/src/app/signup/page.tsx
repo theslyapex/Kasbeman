@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { SignupForm } from "./signup-form";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "ایجاد حساب" };
 
 export default async function SignupPage() {
