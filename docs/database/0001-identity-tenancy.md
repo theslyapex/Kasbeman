@@ -1,8 +1,8 @@
 # Database foundation: identity and tenancy
 
-- Status: design draft; not applied to any database
+- Status: applied to Supabase project `xitrazjbemmkarawejfe` on 2026-11-27 (migration version `20261127081007`)
 - Target: PostgreSQL 17 / Supabase Auth
-- Scope: global user identity, businesses, branches, memberships, and invitations. Role/permission tables are a follow-up migration and are not represented by the temporary `role_key` field as a complete RBAC system.
+- Scope: global user identity, businesses, branches, memberships, and invitations. The first migration establishes the identity and tenant boundary. The follow-up RBAC migration is prepared separately at `supabase/migrations/20261127083000_rbac_authorization_foundation.sql`; it has been transaction-tested but has not been applied to the hosted database.
 
 ## Goals
 
