@@ -69,6 +69,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         builder: (_) => HomeScreen(
           email: widget.email,
           membership: membership,
+          repository: _repository,
           onSwitchWorkspace: () {
             navigator.pushReplacement(
               MaterialPageRoute<void>(
