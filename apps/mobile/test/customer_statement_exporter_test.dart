@@ -21,7 +21,7 @@ void main() {
       balanceDue: 1200,
     );
     final sales = [
-      const SaleRecord(
+      SaleRecord(
         id: 'sale-before',
         saleNumber: '100',
         customerName: customer.name,
@@ -43,7 +43,7 @@ void main() {
       ),
     ];
     final receipts = [
-      const CustomerReceiptRecord(
+      CustomerReceiptRecord(
         id: 'receipt-before',
         saleNumber: '100',
         amount: 200,
