@@ -1,9 +1,15 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../inventory/inventory_screen.dart';
 import '../workspace/branch_selection_store.dart';
 import '../workspace/create_branch_screen.dart';
 import '../workspace/workspace_repository.dart';
+
+const _inventoryModuleEnabled = bool.fromEnvironment(
+  'KASBEMAN_INVENTORY_ENABLED',
+  defaultValue: false,
+);
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -310,6 +316,35 @@ class _HomeScreenState extends State<HomeScreen> {
                                       label: const Text('افزودن شعبه'),
                                     ),
                                   ],
+                                  const SizedBox(height: 14),
+                                  const Divider(color: Colors.white12),
+                                  const SizedBox(height: 8),
+                                  FilledButton.icon(
+                                    onPressed: _inventoryModuleEnabled
+                                        ? () => Navigator.of(context).push(
+                                              MaterialPageRoute<void>(
+                                                builder: (_) => InventoryScreen(
+                                                  membership: widget.membership,
+                                                  branch: selected,
+                                                ),
+                                              ),
+                                            )
+                                        : null,
+                                    icon: const Icon(Icons.inventory_2_outlined),
+                                    label: const Text('مدیریت کالا و انبار'),
+                                  ),
+                                  if (!_inventoryModuleEnabled)
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 8),
+                                      child: Text(
+                                        'پس از تأیید و نصب مهاجرت دیتابیس فعال می‌شود.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: Colors.white54,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
                                 ],
                               );
                             },
