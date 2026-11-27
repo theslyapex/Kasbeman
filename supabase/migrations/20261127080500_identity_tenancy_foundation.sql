@@ -221,10 +221,13 @@ revoke all on table public.profiles, public.businesses, public.business_members,
   public.branches, public.business_invitations from anon, authenticated;
 
 grant select, insert, update on table public.profiles to authenticated;
-grant select, update on table public.businesses to authenticated;
+grant select on table public.businesses to authenticated;
+grant update (name, slug) on table public.businesses to authenticated;
 grant select on table public.business_members to authenticated;
-grant select, insert, update on table public.branches to authenticated;
-grant select, insert, update on table public.business_invitations to authenticated;
+grant select, insert on table public.branches to authenticated;
+grant update (name, code, is_primary, status) on table public.branches to authenticated;
+grant select, insert on table public.business_invitations to authenticated;
+grant update (email, role_key, status, expires_at) on table public.business_invitations to authenticated;
 
 -- Business bootstrap is atomic: tenant + owner membership + primary branch.
 create or replace function public.create_business(p_name text, p_slug text)
