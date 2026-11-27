@@ -27,6 +27,21 @@ INSERT INTO public.stock_movements (
   :'branch_id'::uuid, :'warehouse_id'::uuid, auth.uid(), 'CI seed stock'
 );
 
+SELECT set_config('kasbeman.test_business_id', :'business_id', false);
+SELECT set_config('kasbeman.test_warehouse_id', :'warehouse_id', false);
+SELECT set_config('kasbeman.test_product_id', :'product_id', false);
+
+DO $$
+BEGIN
+  IF (SELECT quantity_on_hand FROM public.stock_balances
+      WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
+        AND warehouse_id = current_setting('kasbeman.test_warehouse_id')::uuid
+        AND product_id = current_setting('kasbeman.test_product_id')::uuid) <> 10 THEN
+    RAISE EXCEPTION 'Inbound movement did not increase stock';
+  END IF;
+END
+$$;
+
 SELECT public.create_sale_draft(
   :'business_id'::uuid,
   :'branch_id'::uuid,
@@ -45,10 +60,6 @@ SELECT public.create_sale_draft(
 
 SELECT public.confirm_sale(:'sale_id'::uuid);
 SELECT public.record_customer_receipt(:'sale_id'::uuid, 50, 'cash') AS receipt_id \gset
-
-SELECT set_config('kasbeman.test_business_id', :'business_id', false);
-SELECT set_config('kasbeman.test_warehouse_id', :'warehouse_id', false);
-SELECT set_config('kasbeman.test_product_id', :'product_id', false);
 SELECT set_config('kasbeman.test_sale_id', :'sale_id', false);
 
 DO $$
@@ -82,7 +93,7 @@ BEGIN
     RAISE EXCEPTION 'Invoice balance was not restored after receipt reversal';
   END IF;
 END
-$;
+$$;
 
 SELECT public.create_sale_draft(
   :'business_id'::uuid,
@@ -98,10 +109,10 @@ SELECT public.create_sale_draft(
   :'customer_id'::uuid,
   NULL,
   'Insufficient stock rollback test'
-) AS insufficient_sale_id \\gset
+) AS insufficient_sale_id \gset
 SELECT set_config('kasbeman.test_insufficient_sale_id', :'insufficient_sale_id', false);
 
-DO $
+DO $$
 BEGIN
   BEGIN
     PERFORM public.confirm_sale(current_setting('kasbeman.test_insufficient_sale_id')::uuid);
@@ -110,7 +121,6 @@ BEGIN
     WHEN check_violation THEN
       NULL;
   END;
-
   IF (SELECT status FROM public.sales
       WHERE id = current_setting('kasbeman.test_insufficient_sale_id')::uuid) <> 'draft' THEN
     RAISE EXCEPTION 'Failed sale confirmation did not roll back sale status';
@@ -122,7 +132,7 @@ BEGIN
     RAISE EXCEPTION 'Failed sale confirmation changed stock balance';
   END IF;
 END
-$;
+$$;
 
 RESET ROLE;
 SET ROLE authenticated;
@@ -140,4 +150,4 @@ END
 $$;
 
 RESET ROLE;
-SELECT 'PostgreSQL schema, sales, stock, receipts, reversals, and tenant-isolation tests passed.' AS result;
+SELECT 'PostgreSQL schema, sales, stock, receipts, reversals, insufficient-stock rollback, and tenant-isolation tests passed.' AS result;
