@@ -19,8 +19,7 @@ class CustomersScreen extends StatefulWidget {
 
 class _CustomersScreenState extends State<CustomersScreen> {
   final _search = TextEditingController();
-  final Map<String, Future<List<SaleRecord>>> _purchaseHistory = {};
-  final Map<String, Future<List<CustomerReceiptRecord>>> _receiptHistory = {};
+  final Map<String, Future<List<_CustomerLedgerEntry>>> _ledgerHistory = {};
   final Set<String> _expandedCustomers = {};
   bool _showArchived = false;
   late Future<List<CustomerRecord>> _future;
@@ -39,29 +38,47 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
 
-  Future<List<SaleRecord>> _historyFor(String customerId) {
-    return _purchaseHistory.putIfAbsent(
-      customerId,
-      () => widget.repository.fetchCustomerSales(
-        businessId: widget.businessId,
-        customerId: customerId,
-      ),
-    );
-  }
-
-  Future<List<CustomerReceiptRecord>> _receiptsFor(String customerId) {
-    return _receiptHistory.putIfAbsent(
-      customerId,
-      () => widget.repository.fetchCustomerReceipts(
-        businessId: widget.businessId,
-        customerId: customerId,
-      ),
-    );
+  Future<List<_CustomerLedgerEntry>> _ledgerFor(String customerId) {
+    return _ledgerHistory.putIfAbsent(customerId, () async {
+      final results = await Future.wait<Object>([
+        widget.repository.fetchCustomerSales(
+          businessId: widget.businessId,
+          customerId: customerId,
+        ),
+        widget.repository.fetchCustomerReceipts(
+          businessId: widget.businessId,
+          customerId: customerId,
+        ),
+      ]);
+      final sales = results[0] as List<SaleRecord>;
+      final receipts = results[1] as List<CustomerReceiptRecord>;
+      final entries = <_CustomerLedgerEntry>[
+        for (final sale in sales)
+          _CustomerLedgerEntry(
+            date: sale.createdAt,
+            amount: sale.grandTotal,
+            title: 'فاکتور ${sale.saleNumber}',
+            subtitle: '${sale.items.length} قلم کالا و خدمت • مانده ${_money(sale.balanceDue)} تومان',
+            isReceipt: false,
+          ),
+        for (final receipt in receipts)
+          _CustomerLedgerEntry(
+            date: receipt.receivedAt,
+            amount: receipt.amount,
+            title: 'دریافت از فاکتور ${receipt.saleNumber}',
+            subtitle: '${_paymentMethodLabel(receipt.paymentMethod)}'
+                '${receipt.reference == null ? '' : ' • ${receipt.reference}'}',
+            isReceipt: true,
+          ),
+      ];
+      entries.sort((a, b) => b.date.compareTo(a.date));
+      return entries;
+    });
   }
 
   Future<void> _refresh() async {
-    _purchaseHistory.clear();
-    _receiptHistory.clear();
+    _ledgerHistory.clear();
+    
     setState(_load);
     await _future;
   }
@@ -79,8 +96,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
       ),
     );
     if (saved == true && mounted) {
-      _purchaseHistory.remove(customer.id);
-      _receiptHistory.remove(customer.id);
+      _ledgerHistory.remove(customer.id);
+      
       setState(_load);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('پرونده مشتری به‌روزرسانی شد.')),
@@ -119,8 +136,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
         status: archive ? 'archived' : 'active',
       );
       if (!mounted) return;
-      _purchaseHistory.remove(customer.id);
-      _receiptHistory.remove(customer.id);
+      _ledgerHistory.remove(customer.id);
+      
       setState(_load);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(archive ? 'مشتری بایگانی شد.' : 'مشتری فعال شد.')),
@@ -166,8 +183,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
         ),
       );
       if (saved == true && mounted) {
-        _purchaseHistory.remove(customer.id);
-        _receiptHistory.remove(customer.id);
+        _ledgerHistory.remove(customer.id);
+        
         setState(_load);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('دریافت وجه ثبت شد.')),
@@ -384,16 +401,6 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             _CustomerDetail(label: 'ایمیل', value: customer.email),
                             _CustomerDetail(label: 'نشانی', value: customer.address),
                             _CustomerDetail(label: 'یادداشت', value: customer.notes),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                              child: Row(
-                                children: [
-                                  Expanded(child: _Metric(label: 'خریدهای تأییدشده', value: customer.purchaseCount.toString())),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: _Metric(label: 'مجموع خرید', value: '${_money(customer.totalPurchases)} تومان')),
-                                ],
-                              ),
-                            ),
                             if (!_expandedCustomers.contains(customer.id))
                               const SizedBox.shrink()
                             else ...[
@@ -403,17 +410,45 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                   children: [
                                     Row(
                                       children: [
-                                        Expanded(child: _Metric(label: 'فاکتورهای تأییدشده', value: customer.purchaseCount.toString())),
-                                        const SizedBox(width: 12),
-                                        Expanded(child: _Metric(label: 'مجموع خرید', value: '${_money(customer.totalPurchases)} تومان')),
+                                        Expanded(
+                                          child: _Metric(
+                                            label: 'فاکتورهای تأییدشده',
+                                            value: customer.purchaseCount.toString(),
+                                            icon: Icons.receipt_long_outlined,
+                                            accent: const Color(0xFF00D8E8),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: _Metric(
+                                            label: 'مجموع خرید',
+                                            value: '${_money(customer.totalPurchases)} تومان',
+                                            icon: Icons.trending_up_rounded,
+                                            accent: const Color(0xFF6FA8FF),
+                                          ),
+                                        ),
                                       ],
                                     ),
-                                    const SizedBox(height: 14),
+                                    const SizedBox(height: 10),
                                     Row(
                                       children: [
-                                        Expanded(child: _Metric(label: 'دریافت‌شده', value: '${_money(customer.totalReceived)} تومان')),
-                                        const SizedBox(width: 12),
-                                        Expanded(child: _Metric(label: 'مانده حساب', value: '${_money(customer.balanceDue)} تومان')),
+                                        Expanded(
+                                          child: _Metric(
+                                            label: 'دریافت‌شده',
+                                            value: '${_money(customer.totalReceived)} تومان',
+                                            icon: Icons.south_west_rounded,
+                                            accent: const Color(0xFF5AD6A0),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: _Metric(
+                                            label: 'مانده حساب',
+                                            value: '${_money(customer.balanceDue)} تومان',
+                                            icon: Icons.account_balance_wallet_outlined,
+                                            accent: const Color(0xFFFFC56E),
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ],
@@ -449,99 +484,77 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                   ],
                                 ),
                               ),
-                              FutureBuilder<List<SaleRecord>>(
-                                future: _historyFor(customer.id),
-                                builder: (context, history) {
-                                  if (history.connectionState == ConnectionState.waiting) {
+                              FutureBuilder<List<_CustomerLedgerEntry>>(
+                                future: _ledgerFor(customer.id),
+                                builder: (context, ledger) {
+                                  if (ledger.connectionState == ConnectionState.waiting) {
                                     return const Padding(
-                                      padding: EdgeInsets.all(14),
-                                      child: Center(child: CircularProgressIndicator()),
-                                    );
-                                  }
-                                  if (history.hasError) {
-                                    return const ListTile(
-                                      dense: true,
-                                      title: Text('سابقه خرید در دسترس نیست'),
-                                    );
-                                  }
-                                  final purchases = history.data ?? const <SaleRecord>[];
-                                  if (purchases.isEmpty) {
-                                    return const ListTile(
-                                      dense: true,
-                                      title: Text('هنوز خرید تأییدشده‌ای ثبت نشده است.'),
-                                    );
-                                  }
-                                  return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      const Padding(
-                                        padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
-                                        child: Text('سوابق خرید و مانده فاکتورها', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      ),
-                                      ...purchases.map((sale) => ListTile(
-                                        dense: true,
-                                        leading: const Icon(Icons.receipt_long_outlined, color: Color(0xFF00D8E8)),
-                                        title: Text(sale.saleNumber),
-                                        subtitle: Text('${sale.items.length} قلم • ${_date(sale.createdAt)}'),
-                                        trailing: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          crossAxisAlignment: CrossAxisAlignment.end,
-                                          children: [
-                                            Text('${_money(sale.grandTotal)} تومان'),
-                                            Text(
-                                              sale.balanceDue == 0
-                                                  ? 'تسویه‌شده'
-                                                  : 'مانده ${_money(sale.balanceDue)}',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: sale.balanceDue == 0
-                                                    ? const Color(0xFF5AD6A0)
-                                                    : const Color(0xFFFFC56E),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      )),
-                                    ],
-                                  );
-                                },
-                              ),
-                              FutureBuilder<List<CustomerReceiptRecord>>(
-                                future: _receiptsFor(customer.id),
-                                builder: (context, receipts) {
-                                  if (receipts.connectionState == ConnectionState.waiting) {
-                                    return const Padding(
-                                      padding: EdgeInsets.all(12),
+                                      padding: EdgeInsets.all(18),
                                       child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
                                     );
                                   }
-                                  if (receipts.hasError) {
+                                  if (ledger.hasError) {
                                     return const ListTile(
                                       dense: true,
-                                      title: Text('دریافت‌های ثبت‌شده در دسترس نیستند.'),
+                                      leading: Icon(Icons.cloud_off_outlined),
+                                      title: Text('گردش حساب در دسترس نیست. دوباره تلاش کن.'),
                                     );
                                   }
-                                  final entries = receipts.data ?? const <CustomerReceiptRecord>[];
+                                  final entries = ledger.data ?? const <_CustomerLedgerEntry>[];
                                   if (entries.isEmpty) {
                                     return const ListTile(
                                       dense: true,
-                                      leading: Icon(Icons.payments_outlined),
-                                      title: Text('هنوز دریافتی برای این مشتری ثبت نشده است.'),
+                                      leading: Icon(Icons.receipt_long_outlined),
+                                      title: Text('هنوز فاکتور یا دریافتی برای این مشتری ثبت نشده است.'),
                                     );
                                   }
                                   return Column(
                                     crossAxisAlignment: CrossAxisAlignment.stretch,
                                     children: [
                                       const Padding(
-                                        padding: EdgeInsets.fromLTRB(16, 10, 16, 4),
-                                        child: Text('سوابق دریافت وجه', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                                        child: Text(
+                                          'گردش حساب',
+                                          style: TextStyle(fontWeight: FontWeight.w800),
+                                        ),
                                       ),
-                                      ...entries.map((receipt) => ListTile(
+                                      ...entries.map((entry) => ListTile(
                                         dense: true,
-                                        leading: const Icon(Icons.south_west_rounded, color: Color(0xFF5AD6A0)),
-                                        title: Text('${receipt.saleNumber} • ${_paymentMethodLabel(receipt.paymentMethod)}'),
-                                        subtitle: Text('${_date(receipt.receivedAt)}${receipt.reference == null ? '' : ' • ${receipt.reference}'}'),
-                                        trailing: Text('${_money(receipt.amount)} تومان'),
+                                        leading: CircleAvatar(
+                                          radius: 18,
+                                          backgroundColor: (entry.isReceipt
+                                                  ? const Color(0xFF5AD6A0)
+                                                  : const Color(0xFF00D8E8))
+                                              .withValues(alpha: 0.12),
+                                          child: Icon(
+                                            entry.isReceipt
+                                                ? Icons.south_west_rounded
+                                                : Icons.receipt_long_outlined,
+                                            size: 18,
+                                            color: entry.isReceipt
+                                                ? const Color(0xFF5AD6A0)
+                                                : const Color(0xFF00D8E8),
+                                          ),
+                                        ),
+                                        title: Text(
+                                          entry.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        subtitle: Text(
+                                          '${entry.subtitle} • ${_date(entry.date)}',
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        trailing: Text(
+                                          '${entry.isReceipt ? '−' : '+'}${_money(entry.amount)}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            color: entry.isReceipt
+                                                ? const Color(0xFF5AD6A0)
+                                                : const Color(0xFF00D8E8),
+                                          ),
+                                        ),
                                       )),
                                     ],
                                   );
@@ -576,21 +589,75 @@ class _CustomerDetail extends StatelessWidget {
 }
 
 class _Metric extends StatelessWidget {
-  const _Metric({required this.label, required this.value});
+  const _Metric({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.accent,
+  });
+
   final String label;
   final String value;
+  final IconData icon;
+  final Color accent;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label, style: const TextStyle(color: Colors.white60, fontSize: 11)),
-      const SizedBox(height: 5),
-      Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-    ],
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(minHeight: 76),
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 12),
+    decoration: BoxDecoration(
+      color: accent.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: accent.withValues(alpha: 0.20)),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, size: 19, color: accent),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white60, fontSize: 10.5),
+              ),
+              const SizedBox(height: 5),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
   );
 }
 
+class _CustomerLedgerEntry {
+  const _CustomerLedgerEntry({
+    required this.date,
+    required this.amount,
+    required this.title,
+    required this.subtitle,
+    required this.isReceipt,
+  });
+
+  final DateTime date;
+  final num amount;
+  final String title;
+  final String subtitle;
+  final bool isReceipt;
+}
 class _CustomerForm extends StatefulWidget {
   const _CustomerForm({
     required this.repository,
