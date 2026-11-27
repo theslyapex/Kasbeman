@@ -12,11 +12,13 @@ class WorkspaceScreen extends StatefulWidget {
     required this.email,
     this.repository,
     this.branchSelectionStore,
+    this.userId = 'local-user',
   });
 
   final String email;
   final WorkspaceRepository? repository;
   final BranchSelectionStore? branchSelectionStore;
+  final String userId;
 
   @override
   State<WorkspaceScreen> createState() => _WorkspaceScreenState();
@@ -74,10 +76,14 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           membership: membership,
           repository: _repository,
           branchSelectionStore: widget.branchSelectionStore,
+          userId: widget.userId,
           onSwitchWorkspace: () {
             navigator.pushReplacement(
               MaterialPageRoute<void>(
-                builder: (_) => WorkspaceScreen(email: widget.email),
+                builder: (_) => WorkspaceScreen(
+                  email: widget.email,
+                  userId: widget.userId,
+                ),
               ),
             );
           },
