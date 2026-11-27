@@ -223,7 +223,7 @@ RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
 
-DO $
+DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.businesses WHERE slug = 'kasbeman-ci-tenant') THEN
     RAISE EXCEPTION 'Active tenant member cannot see the business';
@@ -232,13 +232,13 @@ BEGIN
     RAISE EXCEPTION 'Branch-only member can see customers without CRM permission';
   END IF;
 END
-$;
+$$;
 
 RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000003';
 
-DO $
+DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM public.businesses WHERE slug = 'kasbeman-ci-tenant') THEN
     RAISE EXCEPTION 'Unrelated user can see another tenant business';
@@ -247,7 +247,7 @@ BEGIN
     RAISE EXCEPTION 'Unrelated user can see another tenant customer';
   END IF;
 END
-$;
+$$;
 
 RESET ROLE;
 SELECT 'PostgreSQL 17: schema, sales, stock, receipts, reversals, insufficient-stock rollback, branch-scoped RBAC, read-only enforcement, and cross-tenant isolation passed.' AS result;
