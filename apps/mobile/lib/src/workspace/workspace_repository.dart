@@ -36,6 +36,11 @@ class BusinessMembership {
 
 abstract interface class WorkspaceRepository {
   Future<List<BusinessMembership>> fetchMyBusinesses();
+
+  Future<String> createBusiness({
+    required String name,
+    required String slug,
+  });
 }
 
 class SupabaseWorkspaceRepository implements WorkspaceRepository {
@@ -70,5 +75,25 @@ class SupabaseWorkspaceRepository implements WorkspaceRepository {
           ),
         )
         .toList(growable: false);
+  }
+
+  @override
+  Future<String> createBusiness({
+    required String name,
+    required String slug,
+  }) async {
+    final result = await _client.rpc(
+      'create_business',
+      params: {
+        'p_name': name.trim(),
+        'p_slug': slug.trim().toLowerCase(),
+      },
+    );
+
+    if (result is! String || result.isEmpty) {
+      throw const FormatException('Unexpected business identifier.');
+    }
+
+    return result;
   }
 }
