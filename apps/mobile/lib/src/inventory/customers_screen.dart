@@ -12,6 +12,7 @@ class CustomersScreen extends StatefulWidget {
     super.key,
     required this.businessId,
     required this.repository,
+    required this.permissions,
   });
 
   final String businessId;
@@ -408,7 +409,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
       appBar: AppBar(
         title: const Text('مدیریت مشتریان'),
         actions: [
-          if (_canArchive)
+          if (widget._canArchive)
             IconButton(
               onPressed: () => setState(() {
               _showArchived = !_showArchived;
@@ -420,7 +421,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
           IconButton(onPressed: _refresh, tooltip: 'بروزرسانی', icon: const Icon(Icons.refresh)),
         ],
       ),
-      floatingActionButton: _canCreate
+      floatingActionButton: widget._canCreate
           ? FloatingActionButton.extended(
               onPressed: _addCustomer,
               icon: const Icon(Icons.person_add_alt_1),
@@ -637,7 +638,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                   spacing: 8,
                                   runSpacing: 8,
                                   children: [
-                                    if (_canExport)
+                                    if (widget._canExport)
                                       OutlinedButton.icon(
                                       onPressed: _exportingCustomerId == customer.id
                                           ? null
@@ -651,19 +652,19 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                           : const Icon(Icons.description_outlined, size: 18),
                                       label: const Text('صورت‌حساب'),
                                     ),
-                                    if (_canEdit)
+                                    if (widget._canEdit)
                                       OutlinedButton.icon(
                                       onPressed: () => _editCustomer(customer),
                                       icon: const Icon(Icons.edit_outlined, size: 18),
                                       label: const Text('ویرایش پرونده'),
                                     ),
-                                    if (_canReceive && customer.status == 'active')
+                                    if (widget._canReceive && customer.status == 'active')
                                       FilledButton.tonalIcon(
                                         onPressed: () => _recordReceipt(customer),
                                         icon: const Icon(Icons.payments_outlined, size: 18),
                                         label: const Text('ثبت دریافت'),
                                       ),
-                                    if (_canArchive)
+                                    if (widget._canArchive)
                                       TextButton.icon(
                                       onPressed: () => _changeCustomerStatus(customer),
                                       icon: Icon(
@@ -745,7 +746,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                             style: TextStyle(fontWeight: FontWeight.w800, color: entry.isReceipt
                                               ? const Color(0xFF5AD6A0) : const Color(0xFF00D8E8)),
                                           ),
-                                          if (_canReceive && entry.isReceipt && !entry.isReversed && entry.receiptId != null)
+                                          if (widget._canReceive && entry.isReceipt && !entry.isReversed && entry.receiptId != null)
                                             IconButton(
                                               tooltip: 'برگشت دریافت',
                                               visualDensity: VisualDensity.compact,
