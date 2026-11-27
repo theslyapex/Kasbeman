@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../workspace/workspace_repository.dart';
 import 'inventory_repository.dart';
+import 'inventory_movement_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({
@@ -45,6 +46,24 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
+  Future<void> _openMovements() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => InventoryMovementScreen(
+          membership: widget.membership,
+          branch: widget.branch,
+          repository: _repository,
+        ),
+      ),
+    );
+    if (created == true && mounted) {
+      setState(_reload);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('گردش موجودی ثبت شد.')),
+      );
+    }
+  }
+
   Future<void> _addProduct() async {
     final created = await showModalBottomSheet<bool>(
       context: context,
@@ -83,6 +102,11 @@ class _InventoryScreenState extends State<InventoryScreen>
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'ثبت گردش موجودی',
+            onPressed: _openMovements,
+            icon: const Icon(Icons.swap_horiz),
+          ),
           IconButton(
             tooltip: 'بروزرسانی',
             onPressed: () => setState(_reload),
@@ -128,7 +152,7 @@ class _ProductsTab extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return _InventoryMessage(
+          return const _InventoryMessage(
             title: 'دریافت کالاها ناموفق بود',
             description: 'اتصال یا سطح دسترسی را بررسی و دوباره تلاش کن.',
             icon: Icons.cloud_off_outlined,
@@ -150,8 +174,8 @@ class _ProductsTab extends StatelessWidget {
             final product = products[index];
             return Card(
               child: ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFF00D8E8).withValues(alpha: .12),
+                leading: CircleAvatar(
+                  backgroundColor: const Color(0xFF00D8E8).withValues(alpha: .12),
                   child: Icon(
                     product.isGoods
                         ? Icons.inventory_2_outlined
