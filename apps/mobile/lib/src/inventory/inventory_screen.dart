@@ -6,6 +6,7 @@ import 'inventory_repository.dart';
 import 'inventory_movement_screen.dart';
 import 'inventory_history_screen.dart';
 import 'sales_screen.dart';
+import 'sales_history_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({
@@ -78,6 +79,18 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
   }
 
+  Future<void> _openSalesHistory() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => SalesHistoryScreen(
+          membership: widget.membership,
+          branch: widget.branch,
+          repository: _repository,
+        ),
+      ),
+    );
+  }
+
   Future<void> _openSales() async {
     final created = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -133,7 +146,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             Tab(icon: Icon(Icons.warehouse_outlined), text: 'موجودی شعبه'),
           ],
         ),
-        actions: [
+        actions: [\n          IconButton(\n            tooltip: 'فهرست فروش‌ها',\n            onPressed: _openSalesHistory,\n            icon: const Icon(Icons.receipt_long_outlined),\n          ),
           IconButton(
             tooltip: 'ثبت فروش',
             onPressed: _openSales,
