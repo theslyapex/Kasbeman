@@ -7,6 +7,7 @@ import 'inventory_movement_screen.dart';
 import 'inventory_history_screen.dart';
 import 'sales_screen.dart';
 import 'sales_history_screen.dart';
+import 'customers_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({
@@ -79,6 +80,17 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
   }
 
+  Future<void> _openCustomers() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => CustomersScreen(
+          businessId: widget.membership.businessId,
+          repository: _repository,
+        ),
+      ),
+    );
+  }
+
   Future<void> _openSalesHistory() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
@@ -146,7 +158,13 @@ class _InventoryScreenState extends State<InventoryScreen>
             Tab(icon: Icon(Icons.warehouse_outlined), text: 'موجودی شعبه'),
           ],
         ),
-        actions: [\n          IconButton(\n            tooltip: 'فهرست فروش‌ها',\n            onPressed: _openSalesHistory,\n            icon: const Icon(Icons.receipt_long_outlined),\n          ),
+        actions: [
+          IconButton(
+            tooltip: 'مدیریت مشتریان',
+            onPressed: _openCustomers,
+            icon: const Icon(Icons.people_alt_outlined),
+          ),
+          IconButton(\n            tooltip: 'فهرست فروش‌ها',\n            onPressed: _openSalesHistory,\n            icon: const Icon(Icons.receipt_long_outlined),\n          ),
           IconButton(
             tooltip: 'ثبت فروش',
             onPressed: _openSales,
