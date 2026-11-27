@@ -293,7 +293,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 
 revoke all on function private.log_authorization_change() from public, anon, authenticated;
 
