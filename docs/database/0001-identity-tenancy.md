@@ -2,7 +2,7 @@
 
 - Status: design draft; not applied to any database
 - Target: PostgreSQL 17 / Supabase Auth
-- Scope: global user identity, businesses, branches, memberships, invitations, roles, and permissions
+- Scope: global user identity, businesses, branches, memberships, and invitations. Role/permission tables are a follow-up migration and are not represented by the temporary `role_key` field as a complete RBAC system.
 
 ## Goals
 
@@ -26,7 +26,7 @@
 | `public.role_permissions` | Permission grants to roles | FK to the role and permission catalogue; unique role/permission pair |
 | `public.member_role_assignments` | Assign roles to members | Business-wide assignment when `branch_id IS NULL`; otherwise restricted to that branch |
 
-## Relational constraints
+## Migration boundary\n\nThe first executable migration establishes profiles, business tenants, active/suspended/revoked memberships, branches, invitations, tenant membership helper functions, the atomic business bootstrap RPC, and baseline RLS. It does **not** yet implement custom roles, a permission catalogue, branch-level role assignments, invitation acceptance, or a full audit log. Those require a separately reviewed authorization migration; do not treat `role_key` in this first migration as a complete permission engine.\n\n## Relational constraints
 
 - Use UUID primary keys for tenant entities.
 - Use composite foreign keys containing `business_id` wherever a relation connects two tenant-owned entities. This prevents accidentally attaching a branch, role, or assignment from another business.
