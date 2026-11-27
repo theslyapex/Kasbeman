@@ -1,7 +1,30 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kasbeman_mobile/src/workspace/branch_selection_store.dart';
 import 'package:kasbeman_mobile/src/workspace/workspace_repository.dart';
 import 'package:kasbeman_mobile/src/workspace/workspace_screen.dart';
+
+class _FakeBranchSelectionStore implements BranchSelectionStore {
+  final Map<String, String> values = {};
+
+  String _key(String userId, String businessId) => '$userId:$businessId';
+
+  @override
+  Future<String?> read({
+    required String userId,
+    required String businessId,
+  }) async =>
+      values[_key(userId, businessId)];
+
+  @override
+  Future<void> write({
+    required String userId,
+    required String businessId,
+    required String branchId,
+  }) async {
+    values[_key(userId, businessId)] = branchId;
+  }
+}
 
 class _FakeWorkspaceRepository implements WorkspaceRepository {
   _FakeWorkspaceRepository(this.memberships);
@@ -60,6 +83,7 @@ void main() {
         home: WorkspaceScreen(
           email: 'user@example.com',
           repository: repository,
+          branchSelectionStore: _FakeBranchSelectionStore(),
         ),
       ),
     );
@@ -96,7 +120,9 @@ void main() {
       find.widgetWithText(TextFormField, 'شناسه انگلیسی کسب‌وکار'),
       'aftab-store',
     );
-    await tester.tap(find.text('ساخت کسب‌وکار').last);
+    final submitButton = find.widgetWithText(FilledButton, 'ساخت کسب‌وکار');
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
     await tester.pumpAndSettle();
 
     expect(repository.createCalls, 1);
@@ -117,6 +143,7 @@ void main() {
         home: WorkspaceScreen(
           email: 'user@example.com',
           repository: _FakeWorkspaceRepository([membership]),
+          branchSelectionStore: _FakeBranchSelectionStore(),
         ),
       ),
     );
