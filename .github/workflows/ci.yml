@@ -49,3 +49,42 @@ jobs:
 
       - name: Production build
         run: pnpm build
+
+  lockfile:
+    name: Commit dependency lockfile
+    needs: validate
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate lockfile
+        run: pnpm install --lockfile-only --no-frozen-lockfile
+
+      - name: Commit lockfile when changed
+        run: |
+          git add pnpm-lock.yaml
+          if git diff --cached --quiet; then
+            echo "Lockfile is already up to date."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore: add pnpm lockfile"
+            git push
+          fi
