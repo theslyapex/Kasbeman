@@ -1107,15 +1107,16 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
       }
     }
 
+    final savedRequest = request!;
     setState(() => _saving = true);
     try {
       await widget.repository.recordCustomerReceipt(
-        saleId: request.saleId,
-        amount: request.amount,
-        paymentMethod: request.paymentMethod,
-        idempotencyKey: request.idempotencyKey,
-        reference: request.reference,
-        notes: request.notes,
+        saleId: savedRequest.saleId,
+        amount: savedRequest.amount,
+        paymentMethod: savedRequest.paymentMethod,
+        idempotencyKey: savedRequest.idempotencyKey,
+        reference: savedRequest.reference,
+        notes: savedRequest.notes,
       );
       await widget.pendingStore.clear(
         userId: widget.userId,
