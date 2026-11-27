@@ -81,6 +81,9 @@ class InventoryBalance {
     required this.branchId,
     required this.warehouseId,
     required this.productId,
+    required this.productName,
+    required this.unitName,
+    required this.warehouseName,
     required this.quantity,
     required this.updatedAt,
   });
@@ -89,6 +92,9 @@ class InventoryBalance {
   final String branchId;
   final String warehouseId;
   final String productId;
+  final String productName;
+  final String unitName;
+  final String warehouseName;
   final num quantity;
   final DateTime updatedAt;
 
@@ -98,6 +104,9 @@ class InventoryBalance {
       branchId: json['branch_id'] as String,
       warehouseId: json['warehouse_id'] as String,
       productId: json['product_id'] as String,
+      productName: (json['products'] as Map)['name'] as String,
+      unitName: (json['products'] as Map)['unit_name'] as String,
+      warehouseName: (json['warehouses'] as Map)['name'] as String,
       quantity: json['quantity_on_hand'] as num,
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -220,7 +229,9 @@ class SupabaseInventoryRepository implements InventoryRepository {
     final rows = await _client
         .from('stock_balances')
         .select(
-          'business_id,branch_id,warehouse_id,product_id,quantity_on_hand,updated_at',
+          'business_id,branch_id,warehouse_id,product_id,quantity_on_hand,updated_at,'
+          'products!stock_balances_product_fkey(name,unit_name),'
+          'warehouses!stock_balances_warehouse_fkey(name)',
         )
         .eq('business_id', businessId)
         .eq('branch_id', branchId)
