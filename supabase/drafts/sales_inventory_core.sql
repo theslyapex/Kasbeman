@@ -379,7 +379,8 @@ begin
   if v_user_id is null then
     raise exception 'Authentication required' using errcode = '28000';
   end if;
-  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
+  if p_items is null or jsonb_typeof(p_items) is distinct from 'array'
+     or jsonb_array_length(p_items) = 0 then
     raise exception 'A sale must contain at least one item' using errcode = '22023';
   end if;
 
