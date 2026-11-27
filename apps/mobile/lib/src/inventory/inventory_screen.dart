@@ -9,8 +9,8 @@ class InventoryScreen extends StatefulWidget {
     super.key,
     required this.membership,
     required this.branch,
-    InventoryRepository? repository,
-  }) : repository = repository;
+    this.repository,
+  });
 
   final BusinessMembership membership;
   final BusinessBranch branch;
@@ -150,8 +150,8 @@ class _ProductsTab extends StatelessWidget {
             final product = products[index];
             return Card(
               child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: const Color(0xFF00D8E8).withValues(alpha: .12),
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF00D8E8).withValues(alpha: .12),
                   child: Icon(
                     product.isGoods
                         ? Icons.inventory_2_outlined
