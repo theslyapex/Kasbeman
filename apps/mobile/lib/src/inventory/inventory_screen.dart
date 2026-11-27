@@ -164,7 +164,11 @@ class _InventoryScreenState extends State<InventoryScreen>
             onPressed: _openCustomers,
             icon: const Icon(Icons.people_alt_outlined),
           ),
-          IconButton(\n            tooltip: 'فهرست فروش‌ها',\n            onPressed: _openSalesHistory,\n            icon: const Icon(Icons.receipt_long_outlined),\n          ),
+          IconButton(
+            tooltip: 'فهرست فروش‌ها',
+            onPressed: _openSalesHistory,
+            icon: const Icon(Icons.receipt_long_outlined),
+          ),
           IconButton(
             tooltip: 'ثبت فروش',
             onPressed: _openSales,
