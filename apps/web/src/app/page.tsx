@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const capabilities = [
   {
     number: "۰۱",
@@ -20,10 +22,10 @@ export default function HomePage() {
   return (
     <main className="shell">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="صفحه اصلی کسبمن">
+        <Link className="brand" href="/" aria-label="صفحه اصلی کسبمن">
           <span className="brand-mark">ک</span>
           <span>کسبمن</span>
-        </a>
+        </Link>
         <span className="topbar-note">پلتفرم یکپارچه مدیریت کسب‌وکار</span>
       </header>
 
