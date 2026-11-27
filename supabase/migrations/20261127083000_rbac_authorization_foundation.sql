@@ -215,15 +215,53 @@ as $$
         )
         and (
           r.role_key <> 'owner'
-          or private.has_business_permission(p_business_id, 'team.owners.manage', null)
+          or (
+            p_branch_id is null
+            and private.has_business_permission(p_business_id, 'team.owners.manage', null)
+          )
         )
     );
 $$;
 
+create or replace function private.can_manage_business_member(
+  p_business_id uuid,
+  p_target_user_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $
+  select
+    (select auth.uid()) is not null
+    and (select auth.uid()) <> p_target_user_id
+    and private.has_business_permission(p_business_id, 'team.members.manage', null)
+    and exists (
+      select 1 from public.business_members bm
+      where bm.business_id = p_business_id
+        and bm.user_id = p_target_user_id
+        and bm.status = 'active'
+    )
+    and not exists (
+      select 1
+      from public.member_role_assignments mra
+      join public.roles r
+        on r.business_id = mra.business_id
+       and r.id = mra.role_id
+      where mra.business_id = p_business_id
+        and mra.user_id = p_target_user_id
+        and mra.status = 'active'
+        and r.role_key = 'owner'
+    );
+$;
+
 revoke all on function private.has_business_permission(uuid, text, uuid) from public, anon;
 revoke all on function private.can_assign_business_role(uuid, uuid, uuid, uuid) from public, anon;
+revoke all on function private.can_manage_business_member(uuid, uuid) from public, anon;
 grant execute on function private.has_business_permission(uuid, text, uuid) to authenticated;
 grant execute on function private.can_assign_business_role(uuid, uuid, uuid, uuid) to authenticated;
+grant execute on function private.can_manage_business_member(uuid, uuid) to authenticated;
 
 -- Internal audit log: no direct Data API access. A later audited read path can expose scoped events.
 create table private.authorization_audit_log (
@@ -382,6 +420,15 @@ create policy business_members_select_authorized
   using (
     user_id = (select auth.uid())
     or (select private.has_business_permission(business_id, 'team.members.read', null))
+    or (select private.has_business_permission(business_id, 'team.members.manage', null))
+  );
+
+create policy business_members_update_authorized
+  on public.business_members for update to authenticated
+  using ((select private.can_manage_business_member(business_id, user_id)))
+  with check (
+    status in ('suspended', 'revoked')
+    and (select private.has_business_permission(business_id, 'team.members.manage', null))
   );
 
 drop policy if exists business_invitations_select_owner on public.business_invitations;
@@ -534,6 +581,7 @@ create policy member_role_assignments_revoke_authorized
 revoke all on table public.permissions, public.roles, public.role_permissions,
   public.member_role_assignments from anon, authenticated;
 
+grant update (status) on table public.business_members to authenticated;
 grant select on table public.permissions to authenticated;
 grant select, insert, delete on table public.roles to authenticated;
 grant update (name, description, status) on table public.roles to authenticated;
