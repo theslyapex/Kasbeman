@@ -3,12 +3,22 @@ import { redirect } from "next/navigation";
 import { LoginForm } from "./login-form";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+type LoginPageProps = { searchParams: Promise<{ error?: string }> };
+
 export const metadata = { title: "ورود" };
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: LoginPageProps) {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
   if (data.user) redirect("/dashboard");
+
+  const params = await searchParams;
+  const callbackError =
+    params.error === "verification"
+      ? "تأیید ایمیل انجام نشد یا پیوند منقضی شده است. دوباره درخواست تأیید بده."
+      : params.error === "callback"
+        ? "پیوند ورود یا تأیید معتبر نیست."
+        : null;
 
   return (
     <main className="auth-shell">
@@ -19,6 +29,7 @@ export default async function LoginPage() {
         <span className="section-kicker">KASBEMAN ACCOUNT</span>
         <h1 className="auth-title">خوش برگشتی</h1>
         <p className="auth-description">برای ورود به فضای مدیریت کسب‌وکارت اطلاعات حسابت را وارد کن.</p>
+        {callbackError ? <p className="form-message error" role="alert">{callbackError}</p> : null}
         <LoginForm />
       </section>
       <p className="auth-footnote">کسب‌وکارت، یک قدم جلوتر.</p>
