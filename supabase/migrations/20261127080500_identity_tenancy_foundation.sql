@@ -1,6 +1,8 @@
 -- Kasbeman foundation: identity and tenant isolation
 -- PostgreSQL 17 / Supabase Auth
--- This migration is prepared for review only. It has NOT been applied to Supabase.
+-- Applied to Supabase project xitrazjbemmkarawejfe on 2026-11-27.
+-- Recorded migration version: 20261127081007.
+-- Do not edit an applied migration; use a new migration for follow-up changes.
 
 begin;
 
