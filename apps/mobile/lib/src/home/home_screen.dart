@@ -13,6 +13,7 @@ class HomeScreen extends StatefulWidget {
     required this.repository,
     required this.onSwitchWorkspace,
     this.branchSelectionStore,
+    required this.userId,
   });
 
   final String email;
@@ -20,6 +21,7 @@ class HomeScreen extends StatefulWidget {
   final WorkspaceRepository repository;
   final VoidCallback onSwitchWorkspace;
   final BranchSelectionStore? branchSelectionStore;
+  final String userId;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -42,8 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool get _canManageBranches => widget.membership.roleKey == 'owner';
 
-  String get _userId =>
-      Supabase.instance.client.auth.currentUser?.id ?? 'local-user';
+  String get _userId => widget.userId;
 
   @override
   void initState() {
@@ -266,6 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   DropdownButtonFormField<String>(
+                                    key: ValueKey<String>(selected.id),
                                     initialValue: selected.id,
                                     isExpanded: true,
                                     decoration: const InputDecoration(
