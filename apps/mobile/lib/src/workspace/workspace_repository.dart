@@ -34,12 +34,46 @@ class BusinessMembership {
   }
 }
 
+class BusinessBranch {
+  const BusinessBranch({
+    required this.id,
+    required this.businessId,
+    required this.name,
+    required this.code,
+    required this.isPrimary,
+  });
+
+  final String id;
+  final String businessId;
+  final String name;
+  final String? code;
+  final bool isPrimary;
+
+  factory BusinessBranch.fromJson(Map<String, dynamic> json) {
+    return BusinessBranch(
+      id: json['id'] as String,
+      businessId: json['business_id'] as String,
+      name: json['name'] as String,
+      code: json['code'] as String?,
+      isPrimary: json['is_primary'] as bool? ?? false,
+    );
+  }
+}
+
 abstract interface class WorkspaceRepository {
   Future<List<BusinessMembership>> fetchMyBusinesses();
 
   Future<String> createBusiness({
     required String name,
     required String slug,
+  });
+
+  Future<List<BusinessBranch>> fetchBranches(String businessId);
+
+  Future<String> createBranch({
+    required String businessId,
+    required String name,
+    String? code,
   });
 }
 
@@ -95,5 +129,50 @@ class SupabaseWorkspaceRepository implements WorkspaceRepository {
     }
 
     return result;
+  }
+
+  @override
+  Future<List<BusinessBranch>> fetchBranches(String businessId) async {
+    final rows = await _client
+        .from('branches')
+        .select('id,business_id,name,code,is_primary')
+        .eq('business_id', businessId)
+        .eq('status', 'active')
+        .order('is_primary', ascending: false)
+        .order('created_at');
+
+    return rows
+        .map(
+          (row) => BusinessBranch.fromJson(
+            Map<String, dynamic>.from(row),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<String> createBranch({
+    required String businessId,
+    required String name,
+    String? code,
+  }) async {
+    final normalizedCode = code?.trim().toUpperCase();
+    final row = await _client
+        .from('branches')
+        .insert({
+          'business_id': businessId,
+          'name': name.trim(),
+          'code': normalizedCode == null || normalizedCode.isEmpty
+              ? null
+              : normalizedCode,
+        })
+        .select('id')
+        .single();
+
+    final id = row['id'];
+    if (id is! String || id.isEmpty) {
+      throw const FormatException('Unexpected branch identifier.');
+    }
+    return id;
   }
 }
