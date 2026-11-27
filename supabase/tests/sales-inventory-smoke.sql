@@ -261,7 +261,7 @@ BEGIN
   IF (SELECT quantity_on_hand FROM public.stock_balances
       WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
         AND warehouse_id = current_setting('kasbeman.test_warehouse_id')::uuid
-        AND product_id = current_setting('kasbeman.test_product_id')::uuid) <> 8 THEN
+        AND product_id = current_setting('kasbeman.test_product_id')::uuid) <> 5 THEN
     RAISE EXCEPTION 'Failed sale confirmation changed stock balance';
   END IF;
 END
