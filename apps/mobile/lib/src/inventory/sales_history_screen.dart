@@ -154,7 +154,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                                 '${item.quantity} × ${_money(item.unitPrice)}'
                                 ' • تخفیف ${_money(item.discount)}',
                               ),
-                              trailing: Text('${_money(item.lineTotal)}'),
+                              trailing: Text(_money(item.lineTotal)),
                             )),
                             if (sale.confirmedAt != null)
                               Padding(
