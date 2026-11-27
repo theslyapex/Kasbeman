@@ -11,6 +11,7 @@ BEGIN
 END
 $$;
 
+CREATE SCHEMA extensions;
 CREATE SCHEMA auth;
 CREATE TABLE auth.users (
   id uuid PRIMARY KEY,
