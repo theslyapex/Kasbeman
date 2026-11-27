@@ -47,13 +47,14 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   }
 
   void _openWorkspace(BusinessMembership membership) {
-    Navigator.of(context).pushReplacement(
+    final navigator = Navigator.of(context);
+    navigator.pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => HomeScreen(
           email: widget.email,
           membership: membership,
           onSwitchWorkspace: () {
-            Navigator.of(context).pushReplacement(
+            navigator.pushReplacement(
               MaterialPageRoute<void>(
                 builder: (_) => WorkspaceScreen(email: widget.email),
               ),
