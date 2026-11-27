@@ -1040,7 +1040,7 @@ create policy sale_items_delete_draft_authorized on public.sale_items
       and (select private.has_business_permission(s.business_id, 'sales.orders.manage', s.branch_id))
   ));
 
-revoke all on table public.customers, public.products, public.warehouses, public.stock_balances,
+revoke all on table public.customer_receipts from anon, authenticated;\n\nrevoke all on table public.customers, public.products, public.warehouses, public.stock_balances,
   public.stock_movements, public.sales, public.sale_items from anon, authenticated;
 
 grant select, insert on table public.customers to authenticated;

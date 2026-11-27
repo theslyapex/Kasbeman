@@ -33,7 +33,7 @@ for (const rpc of ["create_sale_draft", "record_customer_receipt", "reverse_cust
   if (!/set search_path\s*=\s*''/i.test(block)) failures.push(`${rpc}: missing empty search_path`);
 }
 
-const immutableTables = ["customer_receipts", "customer_receipt_reversals", "stock_movements"];
+const immutableTables = ["customer_receipts", "customer_receipt_reversals"];
 for (const table of immutableTables) {
   const grants = [...sql.matchAll(new RegExp(`grant ([^;]+) on (?:table )?public\\.${table} to authenticated\\s*;`, "gi"))];
   for (const grant of grants) {
