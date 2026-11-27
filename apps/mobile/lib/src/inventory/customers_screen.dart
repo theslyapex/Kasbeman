@@ -1161,7 +1161,7 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
   }
 
   bool _isDefinitiveReceiptRejection(String? code) =>
-      code != null && const {'22023', '23514', '42501', '28000', 'P0002', '23505'}.contains(code);
+      code != null && const {'22023', '23514', 'P0002'}.contains(code);
 
   @override
   Widget build(BuildContext context) {
