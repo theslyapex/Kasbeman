@@ -1,5 +1,38 @@
-# Kasbeman Mobile
+# کسبمن موبایل
 
-Reserved for the Flutter application. Android is the first target; the architecture must remain iOS-ready.
+اپلیکیشن مستقل Flutter برای Android و iOS. این برنامه با وب‌اپ Next.js یکی نیست؛ هر دو فقط از بک‌اند مشترک کسبمن استفاده می‌کنند.
 
-The mobile app will use the public API and scoped user sessions. It must never connect to PostgreSQL using privileged credentials.
+## وضعیت
+
+این پوشه در مرحله bootstrap است. فایل‌های اولیه Dart و تنظیمات Flutter ایجاد شده‌اند، اما پوشه‌های native اندروید و iOS باید با Flutter SDK تولید و سپس در CI بررسی شوند.
+
+## نیازمندی‌ها
+
+- Flutter stable و Dart سازگار با محدودیت SDK در `pubspec.yaml`
+- Android Studio / Android SDK برای ساخت Android
+- Xcode روی macOS برای ساخت iOS
+
+## راه‌اندازی
+
+از این پوشه:
+
+```bash
+flutter create --platforms=android,ios .
+flutter pub get
+flutter analyze
+flutter test
+```
+
+پس از تولید فایل‌های پلتفرم، آن‌ها را در همین مخزن نگه دارید.
+
+## اصول اتصال به بک‌اند
+
+- استفاده از همان Supabase project وب‌اپ.
+- هیچ service-role یا secret key داخل اپ قرار نگیرد.
+- مجوزها و جداسازی کسب‌وکارها در PostgreSQL/RLS enforce شوند.
+- هر درخواست باید business/workspace فعال را به‌صورت صریح و امن تعیین کند.
+- برای قابلیت آفلاین، عملیات محلی با outbox، شناسه idempotency و سیاست حل تعارض همگام شوند؛ تا قبل از طراحی و تست، نوشتن آفلاین روی داده‌های حساس مالی فعال نشود.
+
+## محدوده نسخه اول موبایل
+
+ابتدا جریان‌های ورود/ثبت‌نام، انتخاب کسب‌وکار، داشبورد و ناوبری اصلی پیاده‌سازی می‌شوند. ماژول‌های تخصصی پس از تثبیت قراردادهای API و مجوزها اضافه خواهند شد.
