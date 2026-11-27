@@ -14,7 +14,7 @@ create table public.permissions (
   description_fa text,
   is_sensitive boolean not null default false,
   created_at timestamptz not null default now(),
-  constraint permissions_key_format check (permission_key ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$'),
+  constraint permissions_key_format check (permission_key ~ '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'),
   constraint permissions_module_action_unique unique (module_key, action_key)
 );
 
