@@ -7,25 +7,81 @@ class _FakeWorkspaceRepository implements WorkspaceRepository {
   _FakeWorkspaceRepository(this.memberships);
 
   final List<BusinessMembership> memberships;
+  int createCalls = 0;
 
   @override
-  Future<List<BusinessMembership>> fetchMyBusinesses() async => memberships;
+  Future<List<BusinessMembership>> fetchMyBusinesses() async =>
+      List.unmodifiable(memberships);
+
+  @override
+  Future<String> createBusiness({
+    required String name,
+    required String slug,
+  }) async {
+    createCalls++;
+    memberships.add(
+      BusinessMembership(
+        businessId: 'business-created',
+        businessName: name,
+        slug: slug,
+        roleKey: 'owner',
+      ),
+    );
+    return 'business-created';
+  }
 }
 
 void main() {
   testWidgets('shows an empty state when the user has no active business',
       (tester) async {
+    final repository = _FakeWorkspaceRepository([]);
+
     await tester.pumpWidget(
       MaterialApp(
         home: WorkspaceScreen(
           email: 'user@example.com',
-          repository: _FakeWorkspaceRepository(const []),
+          repository: repository,
         ),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('هنوز فضای کاری فعالی نداری'), findsOneWidget);
+    expect(find.text('ساخت اولین کسب‌وکار'), findsOneWidget);
+  });
+
+  testWidgets('creates a business and refreshes the workspace list',
+      (tester) async {
+    final repository = _FakeWorkspaceRepository([]);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkspaceScreen(
+          email: 'user@example.com',
+          repository: repository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('ساخت اولین کسب‌وکار'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('ساخت کسب‌وکار'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'نام کسب‌وکار'),
+      'فروشگاه آفتاب',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'شناسه انگلیسی کسب‌وکار'),
+      'aftab-store',
+    );
+    await tester.tap(find.text('ساخت کسب‌وکار').last);
+    await tester.pumpAndSettle();
+
+    expect(repository.createCalls, 1);
+    expect(find.text('فروشگاه آفتاب'), findsOneWidget);
   });
 
   testWidgets('lists memberships and opens the selected workspace',
@@ -41,7 +97,7 @@ void main() {
       MaterialApp(
         home: WorkspaceScreen(
           email: 'user@example.com',
-          repository: _FakeWorkspaceRepository(const [membership]),
+          repository: _FakeWorkspaceRepository([membership]),
         ),
       ),
     );
@@ -54,6 +110,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('فضای کاری شما آماده است'), findsOneWidget);
-    expect(find.text('فروشگاه نمونه'), findsOneWidget);
+    expect(find.text('فروشگاه نمونه'), findsNWidgets(2));
   });
 }
