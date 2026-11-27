@@ -118,8 +118,52 @@ BEGIN
   END;
 END
 $$;
-SELECT public.record_customer_receipt(:'sale_id'::uuid, 50, 'cash') AS receipt_id \gset
+SELECT public.record_customer_receipt(
+  :'sale_id'::uuid, 50, 'cash', '30000000-0000-4000-8000-000000000001'
+) AS receipt_id \gset
 SELECT set_config('kasbeman.test_receipt_id', :'receipt_id', false);
+SELECT set_config('kasbeman.test_receipt_key', '30000000-0000-4000-8000-000000000001', false);
+SELECT public.record_customer_receipt(
+  :'sale_id'::uuid, 50, 'cash', '30000000-0000-4000-8000-000000000001'
+) AS duplicate_receipt_id \gset
+SELECT set_config('kasbeman.test_duplicate_receipt_id', :'duplicate_receipt_id', false);
+
+DO $
+BEGIN
+  IF current_setting('kasbeman.test_receipt_id') <>
+     current_setting('kasbeman.test_duplicate_receipt_id') THEN
+    RAISE EXCEPTION 'Retry returned a different receipt id';
+  END IF;
+  IF (SELECT count(*) FROM public.customer_receipts
+      WHERE sale_id = current_setting('kasbeman.test_sale_id')::uuid) <> 1 THEN
+    RAISE EXCEPTION 'Idempotent retry inserted a duplicate receipt';
+  END IF;
+  IF (SELECT total_received FROM public.customer_invoice_balance_summary
+      WHERE sale_id = current_setting('kasbeman.test_sale_id')::uuid) <> 50 THEN
+    RAISE EXCEPTION 'Idempotent retry changed the received total';
+  END IF;
+END
+$;
+
+DO $
+BEGIN
+  BEGIN
+    PERFORM public.record_customer_receipt(
+      current_setting('kasbeman.test_sale_id')::uuid,
+      25,
+      'cash',
+      current_setting('kasbeman.test_receipt_key')::uuid
+    );
+    RAISE EXCEPTION 'Idempotency key accepted a different request payload';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
+  IF (SELECT count(*) FROM public.customer_receipts
+      WHERE sale_id = current_setting('kasbeman.test_sale_id')::uuid) <> 1 THEN
+    RAISE EXCEPTION 'Mismatched idempotency retry changed receipt count';
+  END IF;
+END
+$;
+
 SELECT set_config('kasbeman.test_sale_id', :'sale_id', false);
 
 DO $$
@@ -337,4 +381,4 @@ END
 $$;
 
 RESET ROLE;
-SELECT 'PostgreSQL 17: schema, sales, idempotent confirmation, stock transfers, duplicate-transfer protection, receipts, duplicate-reversal protection, insufficient-stock rollback, branch-scoped RBAC, read-only enforcement, and cross-tenant isolation passed.' AS result;
+SELECT 'PostgreSQL 17: schema, sales, idempotent confirmation, stock transfers, duplicate-transfer protection, idempotent receipt retries, mismatched idempotency rejection, duplicate-reversal protection, insufficient-stock rollback, branch-scoped RBAC, read-only enforcement, and cross-tenant isolation passed.' AS result;

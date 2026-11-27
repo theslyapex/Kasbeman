@@ -293,6 +293,7 @@ alter table public.sales
 create table public.customer_receipts (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null,
+  idempotency_key uuid not null,
   sale_id uuid not null,
   customer_id uuid not null,
   amount numeric(18,2) not null,
@@ -302,6 +303,7 @@ create table public.customer_receipts (
   received_at timestamptz not null default now(),
   created_by uuid not null references auth.users(id) on delete restrict,
   constraint customer_receipts_amount_positive check (amount > 0),
+  constraint customer_receipts_business_id_idempotency_key_unique unique (business_id, idempotency_key),
   constraint customer_receipts_method_check
     check (payment_method in ('cash', 'card', 'bank_transfer', 'cheque', 'other')),
   constraint customer_receipts_reference_length
@@ -633,10 +635,13 @@ grant execute on function public.create_sale_draft(uuid, uuid, uuid, text, jsonb
 
 -- Confirmation is deliberately a narrowly-scoped SECURITY DEFINER endpoint:
 -- it checks the live user's sales + stock permissions before bypassing table RLS.
+drop function if exists public.record_customer_receipt(uuid, numeric, text, text, text);
+
 create or replace function public.record_customer_receipt(
   p_sale_id uuid,
   p_amount numeric,
   p_payment_method text,
+  p_idempotency_key uuid,
   p_reference text default null,
   p_notes text default null
 )
@@ -644,19 +649,25 @@ returns uuid
 language plpgsql
 security definer
 set search_path = ''
-as $$
+as $
 declare
   v_user_id uuid := (select auth.uid());
   v_sale public.sales%rowtype;
+  v_existing public.customer_receipts%rowtype;
   v_received numeric(18,2);
   v_amount numeric(18,2);
   v_receipt_id uuid;
+  v_reference text := nullif(btrim(p_reference), '');
+  v_notes text := nullif(btrim(p_notes), '');
 begin
   if v_user_id is null then
     raise exception 'Authentication required' using errcode = '28000';
   end if;
   if p_amount is null or p_amount <= 0 then
     raise exception 'Receipt amount must be positive' using errcode = '22023';
+  end if;
+  if p_idempotency_key is null then
+    raise exception 'An idempotency key is required' using errcode = '22023';
   end if;
   v_amount := round(p_amount, 2);
   if p_payment_method not in ('cash', 'card', 'bank_transfer', 'cheque', 'other') then
@@ -680,6 +691,29 @@ begin
     raise exception 'Insufficient permission to record a receipt' using errcode = '42501';
   end if;
 
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(v_sale.business_id::text || ':' || p_idempotency_key::text, 0)
+  );
+
+  select r.* into v_existing
+  from public.customer_receipts r
+  where r.business_id = v_sale.business_id
+    and r.idempotency_key = p_idempotency_key
+  for update;
+
+  if found then
+    if v_existing.sale_id <> v_sale.id
+       or v_existing.amount <> v_amount
+       or v_existing.payment_method <> p_payment_method
+       or v_existing.reference is distinct from v_reference
+       or v_existing.notes is distinct from v_notes
+       or v_existing.created_by <> v_user_id then
+      raise exception 'Idempotency key was already used for a different receipt request'
+        using errcode = '22023';
+    end if;
+    return v_existing.id;
+  end if;
+
   select (coalesce(sum(r.amount), 0) - coalesce(sum(rv.amount), 0))::numeric(18,2)
     into v_received
   from public.customer_receipts r
@@ -693,21 +727,20 @@ begin
 
   insert into public.customer_receipts (
     business_id, sale_id, customer_id, amount, payment_method,
-    reference, notes, created_by
+    idempotency_key, reference, notes, created_by
   ) values (
     v_sale.business_id, v_sale.id, v_sale.customer_id, v_amount,
-    p_payment_method, nullif(btrim(p_reference), ''),
-    nullif(btrim(p_notes), ''), v_user_id
+    p_payment_method, p_idempotency_key, v_reference, v_notes, v_user_id
   )
   returning id into v_receipt_id;
 
   return v_receipt_id;
 end;
-$$;
+$;
 
-revoke all on function public.record_customer_receipt(uuid, numeric, text, text, text)
+revoke all on function public.record_customer_receipt(uuid, numeric, text, uuid, text, text)
   from public, anon, authenticated;
-grant execute on function public.record_customer_receipt(uuid, numeric, text, text, text)
+grant execute on function public.record_customer_receipt(uuid, numeric, text, uuid, text, text)
   to authenticated;
 
 -- Record a full reversal as a new immutable accounting event.

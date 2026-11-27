@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -898,6 +900,8 @@ class _CustomerFormState extends State<_CustomerForm> {
       }
       if (mounted) Navigator.of(context).pop(true);
     } on PostgrestException catch (error) {
+      _idempotencyKey = _newReceiptRequestId();
+      _requestOutcomeUnknown = false;
       if (!mounted) return;
       final message = error.code == '42501'
           ? 'برای ایجاد پرونده مشتری مجوز کافی نداری.'
@@ -905,8 +909,9 @@ class _CustomerFormState extends State<_CustomerForm> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } catch (_) {
       if (!mounted) return;
+      setState(() => _requestOutcomeUnknown = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ارتباط با سرور برقرار نشد.')),
+        const SnackBar(content: Text('نتیجه درخواست مشخص نیست؛ برای جلوگیری از ثبت تکراری، فقط همان درخواست را دوباره ارسال کن.')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -996,7 +1001,9 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
   final _notes = TextEditingController();
   late String _saleId;
   String _method = 'cash';
+  String _idempotencyKey = _newReceiptRequestId();
   bool _saving = false;
+  bool _requestOutcomeUnknown = false;
 
   SaleRecord get _selectedInvoice =>
       widget.invoices.firstWhere((sale) => sale.id == _saleId);
@@ -1037,6 +1044,7 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
         saleId: _saleId,
         amount: amount,
         paymentMethod: _method,
+        idempotencyKey: _idempotencyKey,
         reference: _reference.text,
         notes: _notes.text,
       );
@@ -1092,7 +1100,7 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
                   value: sale.id,
                   child: Text('${sale.saleNumber} • مانده ${_money(sale.balanceDue)} تومان'),
                 )).toList(growable: false),
-                onChanged: _saving ? null : (value) {
+                onChanged: _saving || _requestOutcomeUnknown ? null : (value) {
                   if (value == null) return;
                   setState(() {
                     _saleId = value;
@@ -1103,6 +1111,7 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _amount,
+                enabled: !_saving && !_requestOutcomeUnknown,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(labelText: 'مبلغ دریافتی (تومان) *'),
                 validator: (_) {
@@ -1123,30 +1132,44 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
                   DropdownMenuItem(value: 'cheque', child: Text('چک')),
                   DropdownMenuItem(value: 'other', child: Text('سایر')),
                 ],
-                onChanged: _saving ? null : (value) {
+                onChanged: _saving || _requestOutcomeUnknown ? null : (value) {
                   if (value != null) setState(() => _method = value);
                 },
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _reference,
+                enabled: !_saving && !_requestOutcomeUnknown,
                 decoration: const InputDecoration(labelText: 'شماره پیگیری / مرجع (اختیاری)'),
                 maxLength: 120,
               ),
               TextFormField(
                 controller: _notes,
+                enabled: !_saving && !_requestOutcomeUnknown,
                 decoration: const InputDecoration(labelText: 'یادداشت (اختیاری)'),
                 minLines: 1,
                 maxLines: 3,
                 maxLength: 1000,
               ),
               const SizedBox(height: 14),
+              if (_requestOutcomeUnknown)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    'پاسخ سرور دریافت نشد. اطلاعات این درخواست قفل شده تا با همان شناسه دوباره ارسال شود؛ مبلغ یا فاکتور را تغییر نده.',
+                    style: TextStyle(color: Colors.orangeAccent, fontSize: 12),
+                  ),
+                ),
               FilledButton.icon(
                 onPressed: _saving ? null : _save,
                 icon: _saving
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.check_circle_outline),
-                label: Text(_saving ? 'در حال ثبت...' : 'ثبت دریافت وجه'),
+                label: Text(_saving
+                    ? 'در حال ثبت...'
+                    : _requestOutcomeUnknown
+                        ? 'تلاش دوباره برای همان درخواست'
+                        : 'ثبت دریافت وجه'),
               ),
             ],
           ),
@@ -1173,3 +1196,13 @@ String _money(num value) => value.toStringAsFixed(0).replaceAllMapped(
   RegExp(r'\B(?=(\d{3})+(?!\d))'),
   (match) => ',',
 );
+
+
+String _newReceiptRequestId() {
+  final random = Random.secure();
+  final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  final hex = bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+}

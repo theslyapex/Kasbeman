@@ -351,6 +351,7 @@ abstract interface class InventoryRepository {
     required String saleId,
     required num amount,
     required String paymentMethod,
+    required String idempotencyKey,
     String? reference,
     String? notes,
   });
@@ -560,6 +561,7 @@ class SupabaseInventoryRepository implements InventoryRepository {
     required String saleId,
     required num amount,
     required String paymentMethod,
+    required String idempotencyKey,
     String? reference,
     String? notes,
   }) async {
@@ -567,6 +569,7 @@ class SupabaseInventoryRepository implements InventoryRepository {
       'p_sale_id': saleId,
       'p_amount': amount,
       'p_payment_method': paymentMethod,
+      'p_idempotency_key': idempotencyKey,
       'p_reference': _emptyToNull(reference),
       'p_notes': _emptyToNull(notes),
     });
