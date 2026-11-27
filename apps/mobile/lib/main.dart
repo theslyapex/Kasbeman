@@ -1,13 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+import 'src/auth/auth_screen.dart';
+import 'src/home/home_screen.dart';
+
+const _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+const _supabasePublishableKey =
+    String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const KasbemanApp());
+
+  final configured =
+      _supabaseUrl.isNotEmpty && _supabasePublishableKey.isNotEmpty;
+
+  if (configured) {
+    await Supabase.initialize(
+      url: _supabaseUrl,
+      publishableKey: _supabasePublishableKey,
+    );
+  }
+
+  runApp(KasbemanApp(configured: configured));
 }
 
 class KasbemanApp extends StatelessWidget {
-  const KasbemanApp({super.key});
+  const KasbemanApp({super.key, this.configured = false});
+
+  final bool configured;
 
   @override
   Widget build(BuildContext context) {
@@ -35,84 +56,94 @@ class KasbemanApp extends StatelessWidget {
           foregroundColor: Colors.white,
           centerTitle: false,
         ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: surface,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Colors.white12),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: cyan),
+          ),
+        ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
             backgroundColor: blue,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            minimumSize: const Size.fromHeight(52),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
           ),
         ),
       ),
-      home: const Directionality(
+      home: Directionality(
         textDirection: TextDirection.rtl,
-        child: _WelcomeScreen(),
+        child: configured
+            ? const _AuthGate()
+            : const _ConfigurationScreen(),
       ),
     );
   }
 }
 
-class _WelcomeScreen extends StatelessWidget {
-  const _WelcomeScreen();
+class _AuthGate extends StatelessWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = Supabase.instance.client.auth;
+
+    return StreamBuilder<AuthState>(
+      stream: auth.onAuthStateChange,
+      initialData: AuthState(
+        AuthChangeEvent.initialSession,
+        auth.currentSession,
+      ),
+      builder: (context, snapshot) {
+        final session = snapshot.data?.session ?? auth.currentSession;
+        if (session == null) return const AuthScreen();
+        return HomeScreen(email: session.user.email ?? '');
+      },
+    );
+  }
+}
+
+class _ConfigurationScreen extends StatelessWidget {
+  const _ConfigurationScreen();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('کسبمن'),
-        actions: const [
-          Padding(
-            padding: EdgeInsetsDirectional.only(end: 16),
-            child: Icon(Icons.business_center_outlined),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Icon(
-                    Icons.auto_awesome,
-                    size: 52,
-                    color: Color(0xFF00D8E8),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'کسب‌وکارت، یک قدم جلوتر',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'مدیریت یکپارچه کسب‌وکار، در وب و موبایل؛ با یک حساب و یک فضای کاری مشترک.',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.white70,
-                          height: 1.8,
-                        ),
-                  ),
-                  const SizedBox(height: 28),
-                  FilledButton(
-                    onPressed: () {},
-                    child: const Text('شروع به کار'),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'نسخه پایه اپلیکیشن در حال آماده‌سازی است.',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white54,
-                        ),
-                  ),
-                ],
-              ),
+      appBar: AppBar(title: const Text('کسبمن')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.cloud_off_outlined,
+                    size: 52, color: Color(0xFF00D8E8)),
+                const SizedBox(height: 20),
+                Text(
+                  'اتصال به سرور تنظیم نشده است',
+                  style: Theme.of(context).textTheme.titleLarge,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'برای اجرای نسخه توسعه، آدرس Supabase و کلید عمومی پروژه را از طریق --dart-define تنظیم کن. هیچ کلید محرمانه‌ای نباید داخل اپ قرار بگیرد.',
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
         ),
