@@ -254,10 +254,6 @@ class CustomerRecord {
   final num totalPurchases;
 
   factory CustomerRecord.fromJson(Map<String, dynamic> json) {
-    final sales = (json['sales'] as List? ?? const [])
-        .map((item) => Map<String, dynamic>.from(item as Map))
-        .where((sale) => sale['status'] == 'confirmed')
-        .toList(growable: false);
     return CustomerRecord(
       id: json['id'] as String,
       businessId: json['business_id'] as String,
@@ -268,10 +264,8 @@ class CustomerRecord {
       address: json['address'] as String?,
       notes: json['notes'] as String?,
       status: json['status'] as String,
-      purchaseCount: sales.length,
-      totalPurchases: sales.fold<num>(
-        0, (sum, sale) => sum + (sale['grand_total'] as num),
-      ),
+      purchaseCount: (json['purchase_count'] as num?)?.toInt() ?? 0,
+      totalPurchases: json['total_purchases'] as num? ?? 0,
     );
   }
 }
@@ -280,6 +274,11 @@ abstract interface class InventoryRepository {
   Future<List<InventoryProduct>> fetchProducts(String businessId);
 
   Future<List<CustomerRecord>> fetchCustomers(String businessId);
+
+  Future<List<SaleRecord>> fetchCustomerSales({
+    required String businessId,
+    required String customerId,
+  });
 
   Future<String> createCustomer({
     required String businessId,
@@ -357,17 +356,48 @@ class SupabaseInventoryRepository implements InventoryRepository {
 
   @override
   Future<List<CustomerRecord>> fetchCustomers(String businessId) async {
+    final result = await Future.wait<Object>([
+      _client.from('customers')
+          .select('id,business_id,name,phone,email,company_name,address,notes,status')
+          .eq('business_id', businessId)
+          .eq('status', 'active')
+          .order('name')
+          .limit(500),
+      _client.from('customer_purchase_summary')
+          .select('customer_id,purchase_count,total_purchases')
+          .eq('business_id', businessId),
+    ]);
+    final summary = <String, Map<String, dynamic>>{
+      for (final row in result[1] as List)
+        row['customer_id'] as String: Map<String, dynamic>.from(row),
+    };
+    return (result[0] as List).map((row) {
+      final customer = Map<String, dynamic>.from(row);
+      final totals = summary[customer['id']] ?? const <String, dynamic>{};
+      customer['purchase_count'] = totals['purchase_count'] ?? 0;
+      customer['total_purchases'] = totals['total_purchases'] ?? 0;
+      return CustomerRecord.fromJson(customer);
+    }).toList(growable: false);
+  }
+
+  @override
+  Future<List<SaleRecord>> fetchCustomerSales({
+    required String businessId,
+    required String customerId,
+  }) async {
     final rows = await _client
-        .from('customers')
+        .from('sales')
         .select(
-          'id,business_id,name,phone,email,company_name,address,notes,status,'
-          'sales!sales_customer_fkey(id,grand_total,status)',
+          'id,sale_number,customer_name,status,grand_total,created_at,confirmed_at,'
+          'sale_items!sale_items_sale_fkey(id,product_name_snapshot,quantity,'
+          'unit_price,discount_amount,tax_amount,line_total)',
         )
         .eq('business_id', businessId)
-        .eq('status', 'active')
-        .order('name')
-        .limit(500);
-    return rows.map((row) => CustomerRecord.fromJson(
+        .eq('customer_id', customerId)
+        .eq('status', 'confirmed')
+        .order('created_at', ascending: false)
+        .limit(100);
+    return rows.map((row) => SaleRecord.fromJson(
       Map<String, dynamic>.from(row),
     )).toList(growable: false);
   }
