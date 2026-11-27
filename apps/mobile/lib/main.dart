@@ -108,7 +108,10 @@ class _AuthGate extends StatelessWidget {
       builder: (context, snapshot) {
         final session = snapshot.data?.session ?? auth.currentSession;
         if (session == null) return const AuthScreen();
-        return WorkspaceScreen(email: session.user.email ?? '');
+        return WorkspaceScreen(
+          email: session.user.email ?? '',
+          userId: session.user.id,
+        );
       },
     );
   }
