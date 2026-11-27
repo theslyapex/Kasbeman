@@ -181,6 +181,18 @@ abstract interface class InventoryRepository {
     required String branchId,
   });
 
+  Future<String> createSaleDraft({
+    required String businessId,
+    required String branchId,
+    required String warehouseId,
+    required String saleNumber,
+    required List<Map<String, dynamic>> items,
+    String? customerName,
+    String? notes,
+  });
+
+  Future<void> confirmSale(String saleId);
+
   Future<List<InventoryMovement>> fetchMovements({
     required String businessId,
     required String branchId,
@@ -304,6 +316,36 @@ class SupabaseInventoryRepository implements InventoryRepository {
               Map<String, dynamic>.from(row),
             ))
         .toList(growable: false);
+  }
+
+  @override
+  Future<String> createSaleDraft({
+    required String businessId,
+    required String branchId,
+    required String warehouseId,
+    required String saleNumber,
+    required List<Map<String, dynamic>> items,
+    String? customerName,
+    String? notes,
+  }) async {
+    final result = await _client.rpc('create_sale_draft', params: {
+      'p_business_id': businessId,
+      'p_branch_id': branchId,
+      'p_warehouse_id': warehouseId,
+      'p_sale_number': saleNumber,
+      'p_customer_name': _emptyToNull(customerName),
+      'p_notes': _emptyToNull(notes),
+      'p_items': items,
+    });
+    if (result is! String || result.isEmpty) {
+      throw const FormatException('Unexpected sale identifier.');
+    }
+    return result;
+  }
+
+  @override
+  Future<void> confirmSale(String saleId) async {
+    await _client.rpc('confirm_sale', params: {'p_sale_id': saleId});
   }
 
   @override
