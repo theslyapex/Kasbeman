@@ -45,7 +45,7 @@ jobs:
       - name: Validate SQL dollar-quote delimiters
         run: node scripts/check-sql-delimiters.mjs
 
-      - name: vinext compatibility scan (non-migrating)
+      - name: Validate sales/inventory SQL security structure\n        run: node scripts/check-sales-inventory-security.mjs\n\n      - name: vinext compatibility scan (non-migrating)
         working-directory: apps/web
         run: pnpm dlx vinext check
 
