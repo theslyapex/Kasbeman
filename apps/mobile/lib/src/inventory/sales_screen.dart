@@ -203,23 +203,21 @@ class _SaleFormState extends State<_SaleForm> {
     }
     setState(() => _saving = true);
     try {
-      if (_draftId == null) {
-        _draftId = await widget.repository.createSaleDraft(
-          businessId: widget.membership.businessId,
-          branchId: widget.branch.id,
-          warehouseId: _warehouseId,
-          saleNumber: 'KM-${DateTime.now().millisecondsSinceEpoch}',
-          customerName: _customer.text,
-          customerId: _customerId,
-          notes: _notes.text,
-          items: _lines.map((line) => {
-            'product_id': line.product.id,
-            'quantity': line.quantity,
-            'discount_amount': line.discount,
-            'tax_amount': line.tax,
-          }).toList(growable: false),
-        );
-      }
+      _draftId ??= await widget.repository.createSaleDraft(
+        businessId: widget.membership.businessId,
+        branchId: widget.branch.id,
+        warehouseId: _warehouseId,
+        saleNumber: 'KM-${DateTime.now().millisecondsSinceEpoch}',
+        customerName: _customer.text,
+        customerId: _customerId,
+        notes: _notes.text,
+        items: _lines.map((line) => {
+          'product_id': line.product.id,
+          'quantity': line.quantity,
+          'discount_amount': line.discount,
+          'tax_amount': line.tax,
+        }).toList(growable: false),
+      );
       await widget.repository.confirmSale(_draftId!);
       if (mounted) Navigator.of(context).pop(true);
     } on PostgrestException catch (error) {
