@@ -349,8 +349,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   if (!_inventoryModuleEnabled ||
                                       !result.permissions.contains('inventory.items.read') ||
                                       !result.permissions.contains('inventory.stock.read'))
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 8),
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 8),
                                       child: Text(
                                         !_inventoryModuleEnabled
                                             ? 'این ماژول پس از آماده‌سازی دیتابیس و فعال‌سازی نسخه عملیاتی در دسترس قرار می‌گیرد.'
