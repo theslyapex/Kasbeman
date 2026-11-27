@@ -62,7 +62,6 @@ class _InventoryScreenState extends State<InventoryScreen>
           membership: widget.membership,
           branch: widget.branch,
           repository: _repository,
-          permissions: widget.permissions,
         ),
       ),
     );
@@ -92,6 +91,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         builder: (_) => CustomersScreen(
           businessId: widget.membership.businessId,
           repository: _repository,
+          permissions: widget.permissions,
         ),
       ),
     );
