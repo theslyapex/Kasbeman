@@ -167,6 +167,8 @@ class SaleRecord {
     required this.createdAt,
     required this.confirmedAt,
     required this.items,
+    this.paidAmount = 0,
+    this.balanceDue = 0,
   });
 
   final String id;
@@ -177,6 +179,8 @@ class SaleRecord {
   final DateTime createdAt;
   final DateTime? confirmedAt;
   final List<SaleItemRecord> items;
+  final num paidAmount;
+  final num balanceDue;
 
   factory SaleRecord.fromJson(Map<String, dynamic> json) {
     final rawItems = (json['sale_items'] as List? ?? const []);
@@ -193,6 +197,8 @@ class SaleRecord {
       items: rawItems.map((item) => SaleItemRecord.fromJson(
         Map<String, dynamic>.from(item as Map),
       )).toList(growable: false),
+      paidAmount: json['paid_amount'] as num? ?? 0,
+      balanceDue: json['balance_due'] as num? ?? 0,
     );
   }
 }
@@ -226,6 +232,40 @@ class SaleItemRecord {
   }
 }
 
+class CustomerReceiptRecord {
+  const CustomerReceiptRecord({
+    required this.id,
+    required this.saleNumber,
+    required this.amount,
+    required this.paymentMethod,
+    required this.reference,
+    required this.notes,
+    required this.receivedAt,
+  });
+
+  final String id;
+  final String saleNumber;
+  final num amount;
+  final String paymentMethod;
+  final String? reference;
+  final String? notes;
+  final DateTime receivedAt;
+
+  factory CustomerReceiptRecord.fromJson(Map<String, dynamic> json) {
+    final rawSale = json['sale'];
+    final sale = rawSale is Map ? Map<String, dynamic>.from(rawSale) : null;
+    return CustomerReceiptRecord(
+      id: json['id'] as String,
+      saleNumber: sale?['sale_number'] as String? ?? 'فاکتور',
+      amount: json['amount'] as num,
+      paymentMethod: json['payment_method'] as String,
+      reference: json['reference'] as String?,
+      notes: json['notes'] as String?,
+      receivedAt: DateTime.parse(json['received_at'] as String),
+    );
+  }
+}
+
 class CustomerRecord {
   const CustomerRecord({
     required this.id,
@@ -239,6 +279,8 @@ class CustomerRecord {
     required this.status,
     required this.purchaseCount,
     required this.totalPurchases,
+    required this.totalReceived,
+    required this.balanceDue,
   });
 
   final String id;
@@ -252,6 +294,8 @@ class CustomerRecord {
   final String status;
   final int purchaseCount;
   final num totalPurchases;
+  final num totalReceived;
+  final num balanceDue;
 
   factory CustomerRecord.fromJson(Map<String, dynamic> json) {
     return CustomerRecord(
@@ -266,6 +310,8 @@ class CustomerRecord {
       status: json['status'] as String,
       purchaseCount: (json['purchase_count'] as num?)?.toInt() ?? 0,
       totalPurchases: json['total_purchases'] as num? ?? 0,
+      totalReceived: json['total_received'] as num? ?? 0,
+      balanceDue: json['balance_due'] as num? ?? 0,
     );
   }
 }
@@ -273,11 +319,44 @@ class CustomerRecord {
 abstract interface class InventoryRepository {
   Future<List<InventoryProduct>> fetchProducts(String businessId);
 
-  Future<List<CustomerRecord>> fetchCustomers(String businessId);
+  Future<List<CustomerRecord>> fetchCustomers(
+    String businessId, {
+    bool includeArchived = false,
+  });
 
   Future<List<SaleRecord>> fetchCustomerSales({
     required String businessId,
     required String customerId,
+  });
+
+  Future<List<CustomerReceiptRecord>> fetchCustomerReceipts({
+    required String businessId,
+    required String customerId,
+  });
+
+  Future<String> recordCustomerReceipt({
+    required String saleId,
+    required num amount,
+    required String paymentMethod,
+    String? reference,
+    String? notes,
+  });
+
+  Future<void> updateCustomer({
+    required String businessId,
+    required String customerId,
+    required String name,
+    String? phone,
+    String? email,
+    String? companyName,
+    String? address,
+    String? notes,
+  });
+
+  Future<void> setCustomerStatus({
+    required String businessId,
+    required String customerId,
+    required String status,
   });
 
   Future<String> createCustomer({
@@ -355,16 +434,18 @@ class SupabaseInventoryRepository implements InventoryRepository {
   final SupabaseClient _client;
 
   @override
-  Future<List<CustomerRecord>> fetchCustomers(String businessId) async {
+  Future<List<CustomerRecord>> fetchCustomers(
+    String businessId, {
+    bool includeArchived = false,
+  }) async {
+    var customersQuery = _client.from('customers')
+        .select('id,business_id,name,phone,email,company_name,address,notes,status')
+        .eq('business_id', businessId);
+    if (!includeArchived) customersQuery = customersQuery.eq('status', 'active');
     final result = await Future.wait<Object>([
-      _client.from('customers')
-          .select('id,business_id,name,phone,email,company_name,address,notes,status')
-          .eq('business_id', businessId)
-          .eq('status', 'active')
-          .order('name')
-          .limit(500),
+      customersQuery.order('name').limit(500),
       _client.from('customer_purchase_summary')
-          .select('customer_id,purchase_count,total_purchases')
+          .select('customer_id,purchase_count,total_purchases,total_received,balance_due')
           .eq('business_id', businessId),
     ]);
     final summary = <String, Map<String, dynamic>>{
@@ -376,6 +457,8 @@ class SupabaseInventoryRepository implements InventoryRepository {
       final totals = summary[customer['id']] ?? const <String, dynamic>{};
       customer['purchase_count'] = totals['purchase_count'] ?? 0;
       customer['total_purchases'] = totals['total_purchases'] ?? 0;
+      customer['total_received'] = totals['total_received'] ?? 0;
+      customer['balance_due'] = totals['balance_due'] ?? 0;
       return CustomerRecord.fromJson(customer);
     }).toList(growable: false);
   }
@@ -385,21 +468,110 @@ class SupabaseInventoryRepository implements InventoryRepository {
     required String businessId,
     required String customerId,
   }) async {
-    final rows = await _client
-        .from('sales')
+    final result = await Future.wait<Object>([
+      _client.from('sales')
+          .select(
+            'id,sale_number,customer_name,status,grand_total,created_at,confirmed_at,'
+            'sale_items!sale_items_sale_fkey(id,product_name_snapshot,quantity,'
+            'unit_price,discount_amount,tax_amount,line_total)',
+          )
+          .eq('business_id', businessId)
+          .eq('customer_id', customerId)
+          .eq('status', 'confirmed')
+          .order('created_at', ascending: false)
+          .limit(100),
+      _client.from('customer_invoice_balance_summary')
+          .select('sale_id,total_received,balance_due')
+          .eq('business_id', businessId)
+          .eq('customer_id', customerId),
+    ]);
+    final balances = <String, Map<String, dynamic>>{
+      for (final row in result[1] as List)
+        row['sale_id'] as String: Map<String, dynamic>.from(row),
+    };
+    return (result[0] as List).map((row) {
+      final sale = Map<String, dynamic>.from(row);
+      final balance = balances[sale['id']] ?? const <String, dynamic>{};
+      sale['paid_amount'] = balance['total_received'] ?? 0;
+      sale['balance_due'] = balance['balance_due'] ?? sale['grand_total'];
+      return SaleRecord.fromJson(sale);
+    }).toList(growable: false);
+  }
+
+  @override
+  Future<List<CustomerReceiptRecord>> fetchCustomerReceipts({
+    required String businessId,
+    required String customerId,
+  }) async {
+    final rows = await _client.from('customer_receipts')
         .select(
-          'id,sale_number,customer_name,status,grand_total,created_at,confirmed_at,'
-          'sale_items!sale_items_sale_fkey(id,product_name_snapshot,quantity,'
-          'unit_price,discount_amount,tax_amount,line_total)',
+          'id,amount,payment_method,reference,notes,received_at,'
+          'sale:sales!customer_receipts_sale_customer_fkey(sale_number)',
         )
         .eq('business_id', businessId)
         .eq('customer_id', customerId)
-        .eq('status', 'confirmed')
-        .order('created_at', ascending: false)
+        .order('received_at', ascending: false)
         .limit(100);
-    return rows.map((row) => SaleRecord.fromJson(
+    return rows.map((row) => CustomerReceiptRecord.fromJson(
       Map<String, dynamic>.from(row),
     )).toList(growable: false);
+  }
+
+  @override
+  Future<String> recordCustomerReceipt({
+    required String saleId,
+    required num amount,
+    required String paymentMethod,
+    String? reference,
+    String? notes,
+  }) async {
+    final result = await _client.rpc('record_customer_receipt', params: {
+      'p_sale_id': saleId,
+      'p_amount': amount,
+      'p_payment_method': paymentMethod,
+      'p_reference': _emptyToNull(reference),
+      'p_notes': _emptyToNull(notes),
+    });
+    if (result is! String || result.isEmpty) {
+      throw const FormatException('Unexpected receipt identifier.');
+    }
+    return result;
+  }
+
+  @override
+  Future<void> updateCustomer({
+    required String businessId,
+    required String customerId,
+    required String name,
+    String? phone,
+    String? email,
+    String? companyName,
+    String? address,
+    String? notes,
+  }) async {
+    await _client.from('customers').update({
+      'name': name.trim(),
+      'phone': _emptyToNull(phone),
+      'email': _emptyToNull(email),
+      'company_name': _emptyToNull(companyName),
+      'address': _emptyToNull(address),
+      'notes': _emptyToNull(notes),
+    }).eq('business_id', businessId).eq('id', customerId).select('id').single();
+  }
+
+  @override
+  Future<void> setCustomerStatus({
+    required String businessId,
+    required String customerId,
+    required String status,
+  }) async {
+    if (status != 'active' && status != 'archived') {
+      throw ArgumentError.value(status, 'status');
+    }
+    await _client.from('customers').update({'status': status})
+        .eq('business_id', businessId)
+        .eq('id', customerId)
+        .select('id').single();
   }
 
   @override

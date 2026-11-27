@@ -32,7 +32,15 @@ on conflict do nothing;
 insert into public.role_permissions (business_id, role_id, permission_key)
 select rp.business_id, rp.role_id, 'customers.read'
 from public.role_permissions rp
-where rp.permission_key in ('sales.orders.read', 'sales.orders.manage')
+where rp.permission_key in ('sales.orders.read', 'sales.orders.manage', 'customers.manage')
+on conflict do nothing;
+
+-- Manage permissions imply read access because Postgres UPDATE and the
+-- receipt transaction both need a matching SELECT policy.
+insert into public.role_permissions (business_id, role_id, permission_key)
+select rp.business_id, rp.role_id, 'sales.orders.read'
+from public.role_permissions rp
+where rp.permission_key = 'sales.orders.manage'
 on conflict do nothing;
 
 create table public.products (
@@ -284,6 +292,53 @@ create index sales_business_customer_created_idx
   on public.sales (business_id, customer_id, created_at desc)
   where customer_id is not null;
 
+alter table public.sales
+  add constraint sales_business_id_id_customer_unique unique (business_id, id, customer_id);
+
+create table public.customer_receipts (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null,
+  sale_id uuid not null,
+  customer_id uuid not null,
+  amount numeric(18,2) not null,
+  payment_method text not null,
+  reference text,
+  notes text,
+  received_at timestamptz not null default now(),
+  created_by uuid not null references auth.users(id) on delete restrict,
+  constraint customer_receipts_amount_positive check (amount > 0),
+  constraint customer_receipts_method_check
+    check (payment_method in ('cash', 'card', 'bank_transfer', 'cheque', 'other')),
+  constraint customer_receipts_reference_length
+    check (reference is null or char_length(btrim(reference)) <= 120),
+  constraint customer_receipts_notes_length
+    check (notes is null or char_length(btrim(notes)) <= 1000),
+  constraint customer_receipts_sale_customer_fkey
+    foreign key (business_id, sale_id, customer_id)
+    references public.sales (business_id, id, customer_id) on delete restrict
+);
+
+create index customer_receipts_business_customer_date_idx
+  on public.customer_receipts (business_id, customer_id, received_at desc);
+create index customer_receipts_business_sale_idx
+  on public.customer_receipts (business_id, sale_id, received_at desc);
+
+create or replace view public.customer_invoice_balance_summary
+with (security_invoker = true)
+as
+select
+  s.business_id,
+  s.customer_id,
+  s.id as sale_id,
+  s.grand_total,
+  coalesce(sum(r.amount), 0)::numeric(18,2) as total_received,
+  greatest(s.grand_total - coalesce(sum(r.amount), 0), 0)::numeric(18,2) as balance_due
+from public.sales s
+left join public.customer_receipts r
+  on r.business_id = s.business_id and r.sale_id = s.id
+where s.status = 'confirmed' and s.customer_id is not null
+group by s.business_id, s.customer_id, s.id, s.grand_total;
+
 create or replace view public.customer_purchase_summary
 with (security_invoker = true)
 as
@@ -292,10 +347,14 @@ select
   c.id as customer_id,
   count(s.id) filter (where s.status = 'confirmed') as purchase_count,
   coalesce(sum(s.grand_total) filter (where s.status = 'confirmed'), 0)::numeric(18,2)
-    as total_purchases
+    as total_purchases,
+  coalesce(sum(ib.total_received), 0)::numeric(18,2) as total_received,
+  coalesce(sum(ib.balance_due), 0)::numeric(18,2) as balance_due
 from public.customers c
 left join public.sales s
   on s.business_id = c.business_id and s.customer_id = c.id
+left join public.customer_invoice_balance_summary ib
+  on ib.business_id = s.business_id and ib.sale_id = s.id
 group by c.business_id, c.id;
 
 create table public.sale_items (
@@ -541,6 +600,80 @@ grant execute on function public.create_sale_draft(uuid, uuid, uuid, text, jsonb
 
 -- Confirmation is deliberately a narrowly-scoped SECURITY DEFINER endpoint:
 -- it checks the live user's sales + stock permissions before bypassing table RLS.
+create or replace function public.record_customer_receipt(
+  p_sale_id uuid,
+  p_amount numeric,
+  p_payment_method text,
+  p_reference text default null,
+  p_notes text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user_id uuid := (select auth.uid());
+  v_sale public.sales%rowtype;
+  v_received numeric(18,2);
+  v_amount numeric(18,2);
+  v_receipt_id uuid;
+begin
+  if v_user_id is null then
+    raise exception 'Authentication required' using errcode = '28000';
+  end if;
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Receipt amount must be positive' using errcode = '22023';
+  end if;
+  v_amount := round(p_amount, 2);
+  if p_payment_method not in ('cash', 'card', 'bank_transfer', 'cheque', 'other') then
+    raise exception 'Unsupported payment method' using errcode = '22023';
+  end if;
+
+  select s.* into v_sale
+  from public.sales s
+  where s.id = p_sale_id
+  for update;
+
+  if not found or v_sale.customer_id is null then
+    raise exception 'Customer invoice not found' using errcode = 'P0002';
+  end if;
+  if v_sale.status <> 'confirmed' then
+    raise exception 'Only confirmed invoices can receive payments' using errcode = '22023';
+  end if;
+  if not (select private.has_business_permission(
+    v_sale.business_id, 'sales.orders.manage', v_sale.branch_id
+  )) then
+    raise exception 'Insufficient permission to record a receipt' using errcode = '42501';
+  end if;
+
+  select coalesce(sum(r.amount), 0)::numeric(18,2) into v_received
+  from public.customer_receipts r
+  where r.business_id = v_sale.business_id and r.sale_id = v_sale.id;
+
+  if v_received + v_amount > v_sale.grand_total then
+    raise exception 'Receipt exceeds the remaining invoice balance' using errcode = '23514';
+  end if;
+
+  insert into public.customer_receipts (
+    business_id, sale_id, customer_id, amount, payment_method,
+    reference, notes, created_by
+  ) values (
+    v_sale.business_id, v_sale.id, v_sale.customer_id, v_amount,
+    p_payment_method, nullif(btrim(p_reference), ''),
+    nullif(btrim(p_notes), ''), v_user_id
+  )
+  returning id into v_receipt_id;
+
+  return v_receipt_id;
+end;
+$$;
+
+revoke all on function public.record_customer_receipt(uuid, numeric, text, text, text)
+  from public, anon, authenticated;
+grant execute on function public.record_customer_receipt(uuid, numeric, text, text, text)
+  to authenticated;
+
 create or replace function public.confirm_sale(p_sale_id uuid)
 returns uuid
 language plpgsql
@@ -678,6 +811,7 @@ revoke all on function public.confirm_sale(uuid) from public, anon;
 grant execute on function public.confirm_sale(uuid) to authenticated;
 
 alter table public.customers enable row level security;
+alter table public.customer_receipts enable row level security;
 alter table public.products enable row level security;
 alter table public.warehouses enable row level security;
 alter table public.stock_balances enable row level security;
@@ -698,6 +832,17 @@ create policy customers_update_authorized on public.customers
   for update to authenticated
   using ((select private.has_business_permission(business_id, 'customers.manage', null)))
   with check ((select private.has_business_permission(business_id, 'customers.manage', null)));
+
+create policy customer_receipts_select_authorized on public.customer_receipts
+  for select to authenticated
+  using (exists (
+    select 1 from public.sales s
+    where s.business_id = customer_receipts.business_id
+      and s.id = customer_receipts.sale_id
+      and (select private.has_business_permission(
+        s.business_id, 'sales.orders.read', s.branch_id
+      ))
+  ));
 
 create policy products_select_authorized on public.products
   for select to authenticated
@@ -821,6 +966,8 @@ revoke all on table public.customers, public.products, public.warehouses, public
   public.stock_movements, public.sales, public.sale_items from anon, authenticated;
 
 grant select, insert on table public.customers to authenticated;
+grant select on table public.customer_receipts to authenticated;
+grant select on public.customer_invoice_balance_summary to authenticated;
 grant update (name, phone, email, company_name, address, notes, status)
   on table public.customers to authenticated;
 grant select on public.customer_purchase_summary to authenticated;
