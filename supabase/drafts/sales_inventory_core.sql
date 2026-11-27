@@ -143,7 +143,6 @@ begin
   return new;
 end;
 $;
-
 revoke all on function private.create_default_warehouse_for_branch() from public, anon, authenticated;
 create trigger branch_create_default_warehouse
   after insert on public.branches
@@ -623,7 +622,6 @@ begin
   return v_sale_id;
 end;
 $;
-
 revoke all on function public.create_sale_draft(uuid, uuid, uuid, text, jsonb, uuid, text, text)
   from public, anon;
 grant execute on function public.create_sale_draft(uuid, uuid, uuid, text, jsonb, uuid, text, text)
