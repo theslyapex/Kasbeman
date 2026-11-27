@@ -21,7 +21,7 @@ for (const block of securityDefinerBlocks) {
   }
 }
 
-for (const rpc of ["create_sale_draft", "record_customer_receipt", "reverse_customer_receipt", "confirm_sale"]) {
+for (const rpc of ["record_customer_receipt", "reverse_customer_receipt", "confirm_sale"]) {
   const start = sql.toLowerCase().indexOf(`function public.${rpc}(`);
   if (start < 0) {
     failures.push(`${rpc}: expected RPC function is missing`);
@@ -31,6 +31,20 @@ for (const rpc of ["create_sale_draft", "record_customer_receipt", "reverse_cust
   if (!/security definer/i.test(block)) failures.push(`${rpc}: expected SECURITY DEFINER`);
   if (!/private\.has_business_permission/i.test(block)) failures.push(`${rpc}: missing live permission check`);
   if (!/set search_path\s*=\s*''/i.test(block)) failures.push(`${rpc}: missing empty search_path`);
+}
+
+const draftSaleStart = sql.toLowerCase().indexOf("function public.create_sale_draft(");
+const draftSaleEnd = sql.indexOf("$;", draftSaleStart);
+const draftSaleFunction = sql.slice(draftSaleStart, draftSaleEnd + 3);
+if (draftSaleStart < 0 || !/set search_path\\s*=\\s*''/i.test(draftSaleFunction)) {
+  failures.push("create_sale_draft: missing function definition or empty search_path");
+}
+if (/security definer/i.test(draftSaleFunction)) {
+  failures.push("create_sale_draft: must remain invoker-security and rely on table RLS");
+}
+if (!/create policy sales_insert_authorized[\\s\\S]*?sales\\.orders\\.manage/i.test(sql)
+  || !/create policy sale_items_insert_draft_authorized[\\s\\S]*?sales\\.orders\\.manage/i.test(sql)) {
+  failures.push("create_sale_draft: required RLS insert policies are missing");
 }
 
 const immutableTables = ["customer_receipts", "customer_receipt_reversals"];
