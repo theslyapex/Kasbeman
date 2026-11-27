@@ -1,6 +1,8 @@
 -- Kasbeman foundation: tenant-scoped RBAC and branch assignments
 -- PostgreSQL 17 / Supabase Auth
--- Prepared for review only. Not applied to the hosted Supabase project.
+-- Applied to Supabase project xitrazjbemmkarawejfe on 2026-11-27.
+-- Recorded migration version: 20261127085000.
+-- Do not edit the SQL of an applied migration; use a new migration for follow-up changes.
 -- Depends on 20261127080500_identity_tenancy_foundation.sql.
 
 begin;
