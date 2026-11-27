@@ -37,8 +37,8 @@ export default function HomePage() {
           منعطف و آماده رشد.
         </p>
         <div className="hero-actions">
-          <span className="primary-action">به‌زودی، شروعی تازه</span>
-          <span className="secondary-action">نسخه در حال توسعه</span>
+          <Link className="primary-action" href="/signup">ساخت حساب رایگان</Link>
+          <Link className="secondary-action" href="/login">ورود به حساب</Link>
         </div>
         <div className="hero-orbit" aria-hidden="true">
           <div className="orbit orbit-one" />
