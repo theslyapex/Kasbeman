@@ -273,6 +273,20 @@ create index sales_business_branch_created_idx
 create index sales_business_status_created_idx
   on public.sales (business_id, status, created_at desc);
 
+create or replace view public.customer_purchase_summary
+with (security_invoker = true)
+as
+select
+  c.business_id,
+  c.id as customer_id,
+  count(s.id) filter (where s.status = 'confirmed')::integer as purchase_count,
+  coalesce(sum(s.grand_total) filter (where s.status = 'confirmed'), 0)::numeric(18,2)
+    as total_purchases
+from public.customers c
+left join public.sales s
+  on s.business_id = c.business_id and s.customer_id = c.id
+group by c.business_id, c.id;
+
 create table public.sale_items (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null,
@@ -796,6 +810,7 @@ revoke all on table public.customers, public.products, public.warehouses, public
   public.stock_movements, public.sales, public.sale_items from anon, authenticated;
 
 grant select, insert, update on table public.customers to authenticated;
+grant select on public.customer_purchase_summary to authenticated;
 grant select, insert on table public.products to authenticated;
 grant update (sku, barcode, name, description, product_type, unit_name, sale_price, purchase_price, status)
   on table public.products to authenticated;
