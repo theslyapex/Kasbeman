@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'inventory_repository.dart';
+import 'customer_statement_exporter.dart';
 
 class CustomersScreen extends StatefulWidget {
   const CustomersScreen({
@@ -22,6 +23,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
   final Map<String, Future<List<_CustomerLedgerEntry>>> _ledgerHistory = {};
   final Set<String> _expandedCustomers = {};
   bool _showArchived = false;
+  String? _exportingCustomerId;
   late Future<List<CustomerRecord>> _future;
 
   @override
@@ -202,6 +204,86 @@ class _CustomersScreenState extends State<CustomersScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('ارتباط با سرور برقرار نشد.')),
       );
+    }
+  }
+
+  Future<void> _exportStatement(CustomerRecord customer) async {
+    final now = DateTime.now();
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(now.year + 1, 12, 31),
+      initialDateRange: DateTimeRange(
+        start: DateTime(now.year, now.month, 1),
+        end: DateTime(now.year, now.month, now.day),
+      ),
+      helpText: 'انتخاب بازه صورت‌حساب',
+      saveText: 'ادامه',
+    );
+    if (range == null || !mounted) return;
+
+    final format = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: const Color(0xFF10233D),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('خروجی صورت‌حساب ${customer.name}',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined, color: Color(0xFFFF7777)),
+              title: const Text('گزارش PDF'),
+              subtitle: const Text('مناسب چاپ و ارسال'),
+              onTap: () => Navigator.pop(context, 'pdf'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.table_view_outlined, color: Color(0xFF5AD6A0)),
+              title: const Text('فایل Excel'),
+              subtitle: const Text('قابل ویرایش و تحلیل در صفحه‌گسترده'),
+              onTap: () => Navigator.pop(context, 'excel'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (format == null || !mounted) return;
+
+    setState(() => _exportingCustomerId = customer.id);
+    try {
+      final results = await Future.wait<Object>([
+        widget.repository.fetchCustomerSales(
+          businessId: widget.businessId,
+          customerId: customer.id,
+        ),
+        widget.repository.fetchCustomerReceipts(
+          businessId: widget.businessId,
+          customerId: customer.id,
+        ),
+      ]);
+      final report = CustomerStatementReport.build(
+        customer: customer,
+        startDate: range.start,
+        endDate: range.end,
+        sales: results[0] as List<SaleRecord>,
+        receipts: results[1] as List<CustomerReceiptRecord>,
+      );
+      if (format == 'pdf') {
+        await CustomerStatementExporter.sharePdf(report);
+      } else {
+        await CustomerStatementExporter.shareExcel(report);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('ساخت صورت‌حساب ناموفق بود: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _exportingCustomerId = null);
     }
   }
 
@@ -460,6 +542,19 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                   spacing: 8,
                                   runSpacing: 8,
                                   children: [
+                                    OutlinedButton.icon(
+                                      onPressed: _exportingCustomerId == customer.id
+                                          ? null
+                                          : () => _exportStatement(customer),
+                                      icon: _exportingCustomerId == customer.id
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(strokeWidth: 2),
+                                            )
+                                          : const Icon(Icons.description_outlined, size: 18),
+                                      label: const Text('صورت‌حساب'),
+                                    ),
                                     OutlinedButton.icon(
                                       onPressed: () => _editCustomer(customer),
                                       icon: const Icon(Icons.edit_outlined, size: 18),

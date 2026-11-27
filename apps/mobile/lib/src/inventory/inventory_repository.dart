@@ -468,18 +468,29 @@ class SupabaseInventoryRepository implements InventoryRepository {
     required String businessId,
     required String customerId,
   }) async {
+    Future<List<dynamic>> loadSales() async {
+      final allRows = <dynamic>[];
+      const pageSize = 500;
+      for (var offset = 0;; offset += pageSize) {
+        final page = await _client.from('sales')
+            .select(
+              'id,sale_number,customer_name,status,grand_total,created_at,confirmed_at,'
+              'sale_items!sale_items_sale_fkey(id,product_name_snapshot,quantity,'
+              'unit_price,discount_amount,tax_amount,line_total)',
+            )
+            .eq('business_id', businessId)
+            .eq('customer_id', customerId)
+            .eq('status', 'confirmed')
+            .order('created_at', ascending: false)
+            .range(offset, offset + pageSize - 1);
+        allRows.addAll(page);
+        if (page.length < pageSize) break;
+      }
+      return allRows;
+    }
+
     final result = await Future.wait<Object>([
-      _client.from('sales')
-          .select(
-            'id,sale_number,customer_name,status,grand_total,created_at,confirmed_at,'
-            'sale_items!sale_items_sale_fkey(id,product_name_snapshot,quantity,'
-            'unit_price,discount_amount,tax_amount,line_total)',
-          )
-          .eq('business_id', businessId)
-          .eq('customer_id', customerId)
-          .eq('status', 'confirmed')
-          .order('created_at', ascending: false)
-          .limit(100),
+      loadSales(),
       _client.from('customer_invoice_balance_summary')
           .select('sale_id,total_received,balance_due')
           .eq('business_id', businessId)
@@ -503,16 +514,22 @@ class SupabaseInventoryRepository implements InventoryRepository {
     required String businessId,
     required String customerId,
   }) async {
-    final rows = await _client.from('customer_receipts')
-        .select(
-          'id,amount,payment_method,reference,notes,received_at,'
-          'sale:sales!customer_receipts_sale_customer_fkey(sale_number)',
-        )
-        .eq('business_id', businessId)
-        .eq('customer_id', customerId)
-        .order('received_at', ascending: false)
-        .limit(100);
-    return rows.map((row) => CustomerReceiptRecord.fromJson(
+    final allRows = <dynamic>[];
+    const pageSize = 500;
+    for (var offset = 0;; offset += pageSize) {
+      final page = await _client.from('customer_receipts')
+          .select(
+            'id,amount,payment_method,reference,notes,received_at,'
+            'sale:sales!customer_receipts_sale_customer_fkey(sale_number)',
+          )
+          .eq('business_id', businessId)
+          .eq('customer_id', customerId)
+          .order('received_at', ascending: false)
+          .range(offset, offset + pageSize - 1);
+      allRows.addAll(page);
+      if (page.length < pageSize) break;
+    }
+    return allRows.map((row) => CustomerReceiptRecord.fromJson(
       Map<String, dynamic>.from(row),
     )).toList(growable: false);
   }
