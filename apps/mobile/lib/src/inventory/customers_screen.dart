@@ -900,8 +900,6 @@ class _CustomerFormState extends State<_CustomerForm> {
       }
       if (mounted) Navigator.of(context).pop(true);
     } on PostgrestException catch (error) {
-      _idempotencyKey = _newReceiptRequestId();
-      _requestOutcomeUnknown = false;
       if (!mounted) return;
       final message = error.code == '42501'
           ? 'برای ایجاد پرونده مشتری مجوز کافی نداری.'
@@ -909,9 +907,8 @@ class _CustomerFormState extends State<_CustomerForm> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } catch (_) {
       if (!mounted) return;
-      setState(() => _requestOutcomeUnknown = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('نتیجه درخواست مشخص نیست؛ برای جلوگیری از ثبت تکراری، فقط همان درخواست را دوباره ارسال کن.')),
+        const SnackBar(content: Text('ارتباط با سرور برقرار نشد.')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -1050,6 +1047,9 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
       );
       if (mounted) Navigator.of(context).pop(true);
     } on PostgrestException catch (error) {
+      // A database error response means the transaction rolled back.
+      _idempotencyKey = _newReceiptRequestId();
+      _requestOutcomeUnknown = false;
       if (!mounted) return;
       final message = error.code == '42501'
           ? 'مجوز ثبت دریافت وجه را نداری.'
@@ -1057,8 +1057,9 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } catch (_) {
       if (!mounted) return;
+      setState(() => _requestOutcomeUnknown = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ارتباط با سرور برقرار نشد.')),
+        const SnackBar(content: Text('نتیجه درخواست مشخص نیست؛ برای جلوگیری از ثبت تکراری، فقط همان درخواست را دوباره ارسال کن.')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
