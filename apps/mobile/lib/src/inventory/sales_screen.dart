@@ -33,7 +33,11 @@ class _SalesScreenState extends State<SalesScreen> {
     _data = _load();
   }
 
-  Future<({List<InventoryProduct> products, List<InventoryWarehouse> warehouses})> _load() async {
+  Future<({
+    List<InventoryProduct> products,
+    List<InventoryWarehouse> warehouses,
+    List<CustomerRecord> customers,
+  })> _load() async {
     final result = await Future.wait<Object>([
       widget.repository.fetchProducts(widget.membership.businessId),
       widget.repository.fetchWarehouses(
