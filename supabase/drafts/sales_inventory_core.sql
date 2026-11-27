@@ -809,7 +809,9 @@ create policy sale_items_delete_draft_authorized on public.sale_items
 revoke all on table public.customers, public.products, public.warehouses, public.stock_balances,
   public.stock_movements, public.sales, public.sale_items from anon, authenticated;
 
-grant select, insert, update on table public.customers to authenticated;
+grant select, insert on table public.customers to authenticated;
+grant update (name, phone, email, company_name, address, notes, status)
+  on table public.customers to authenticated;
 grant select on public.customer_purchase_summary to authenticated;
 grant select, insert on table public.products to authenticated;
 grant update (sku, barcode, name, description, product_type, unit_name, sale_price, purchase_price, status)
