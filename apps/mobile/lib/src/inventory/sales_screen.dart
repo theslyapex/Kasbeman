@@ -21,7 +21,11 @@ class SalesScreen extends StatefulWidget {
 }
 
 class _SalesScreenState extends State<SalesScreen> {
-  late Future<({List<InventoryProduct> products, List<InventoryWarehouse> warehouses})> _data;
+  late Future<({
+    List<InventoryProduct> products,
+    List<InventoryWarehouse> warehouses,
+    List<CustomerRecord> customers,
+  })> _data;
 
   @override
   void initState() {
@@ -36,10 +40,12 @@ class _SalesScreenState extends State<SalesScreen> {
         businessId: widget.membership.businessId,
         branchId: widget.branch.id,
       ),
+      widget.repository.fetchCustomers(widget.membership.businessId),
     ]);
     return (
       products: result[0] as List<InventoryProduct>,
       warehouses: result[1] as List<InventoryWarehouse>,
+      customers: result[2] as List<CustomerRecord>,
     );
   }
 
@@ -47,7 +53,11 @@ class _SalesScreenState extends State<SalesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('ثبت فروش')),
-      body: FutureBuilder<({List<InventoryProduct> products, List<InventoryWarehouse> warehouses})>(
+      body: FutureBuilder<({
+        List<InventoryProduct> products,
+        List<InventoryWarehouse> warehouses,
+        List<CustomerRecord> customers,
+      })>(
         future: _data,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -72,6 +82,7 @@ class _SalesScreenState extends State<SalesScreen> {
             repository: widget.repository,
             products: products,
             warehouses: warehouses,
+            customers: snapshot.data!.customers,
           );
         },
       ),
@@ -103,6 +114,7 @@ class _SaleForm extends StatefulWidget {
     required this.repository,
     required this.products,
     required this.warehouses,
+    required this.customers,
   });
 
   final BusinessMembership membership;
@@ -110,6 +122,7 @@ class _SaleForm extends StatefulWidget {
   final InventoryRepository repository;
   final List<InventoryProduct> products;
   final List<InventoryWarehouse> warehouses;
+  final List<CustomerRecord> customers;
 
   @override
   State<_SaleForm> createState() => _SaleFormState();
@@ -118,6 +131,7 @@ class _SaleForm extends StatefulWidget {
 class _SaleFormState extends State<_SaleForm> {
   final _customer = TextEditingController();
   final _notes = TextEditingController();
+  String? _customerId;
   final _quantity = TextEditingController(text: '1');
   final _discount = TextEditingController(text: '0');
   final _tax = TextEditingController(text: '0');
@@ -192,6 +206,7 @@ class _SaleFormState extends State<_SaleForm> {
           warehouseId: _warehouseId,
           saleNumber: 'KM-${DateTime.now().millisecondsSinceEpoch}',
           customerName: _customer.text,
+          customerId: _customerId,
           notes: _notes.text,
           items: _lines.map((line) => {
             'product_id': line.product.id,
@@ -233,10 +248,45 @@ class _SaleFormState extends State<_SaleForm> {
           ),
         ),
         const SizedBox(height: 12),
+        DropdownButtonFormField<String?>(
+          initialValue: _customerId,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'انتخاب مشتری ثبت‌شده'),
+          items: [
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('مشتری گذری / بدون پرونده'),
+            ),
+            ...widget.customers.map((customer) => DropdownMenuItem<String?>(
+              value: customer.id,
+              child: Text(
+                customer.phone == null || customer.phone!.isEmpty
+                    ? customer.name
+                    : '${customer.name} • ${customer.phone}',
+                overflow: TextOverflow.ellipsis,
+              ),
+            )),
+          ],
+          onChanged: _saving || _draftId != null
+              ? null
+              : (value) => setState(() {
+                    _customerId = value;
+                    if (value != null) {
+                      _customer.text = widget.customers
+                          .firstWhere((item) => item.id == value).name;
+                    } else {
+                      _customer.clear();
+                    }
+                  }),
+        ),
+        const SizedBox(height: 10),
         TextField(
           controller: _customer,
-          enabled: !_saving && _draftId == null,
-          decoration: const InputDecoration(labelText: 'نام مشتری (اختیاری)'),
+          enabled: !_saving && _draftId == null && _customerId == null,
+          decoration: const InputDecoration(
+            labelText: 'نام مشتری گذری (اختیاری)',
+            helperText: 'برای سوابق خرید، مشتری را از فهرست بالا انتخاب کن.',
+          ),
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
