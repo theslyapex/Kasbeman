@@ -248,7 +248,7 @@ class CustomerStatementExporter {
   static pw.TableRow _pdfRow(List<String> cells, {bool header = false}) {
     return pw.TableRow(
       decoration: header
-          ? const pw.BoxDecoration(color: PdfColor(0.88, 0.93, 0.97))
+          ? const pw.BoxDecoration(color: pdf.PdfColor(0.88, 0.93, 0.97))
           : null,
       children: [
         for (final value in cells)
