@@ -232,7 +232,7 @@ language sql
 stable
 security definer
 set search_path = ''
-as $
+as $$
   select
     (select auth.uid()) is not null
     and (select auth.uid()) <> p_target_user_id
@@ -254,7 +254,7 @@ as $
         and mra.status = 'active'
         and r.role_key = 'owner'
     );
-$;
+$$;
 
 revoke all on function private.has_business_permission(uuid, text, uuid) from public, anon;
 revoke all on function private.can_assign_business_role(uuid, uuid, uuid, uuid) from public, anon;
