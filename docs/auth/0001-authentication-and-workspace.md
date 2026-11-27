@@ -20,7 +20,7 @@
 - The server validates email, password length, confirmation, business name, and slug with Zod.
 - Authenticated server routes use `auth.getUser()` before returning user-specific data or creating a tenant.
 - Business creation calls the database RPC through the user's cookie-authenticated Supabase client. It does not use a service-role key.
-- Tenant authorization remains enforced by database RLS and the permission helpers; hiding UI is not treated as authorization.
+- Tenant authorization remains enforced by database RLS; hiding UI is not treated as authorization.
 - Callback navigation accepts only same-origin relative paths.
 - The request proxy validates/refreshes claims and marks responses `private, no-store` to avoid shared caching of session responses.
 - No secret key is used in browser code or in `NEXT_PUBLIC_*` variables.
@@ -31,15 +31,21 @@
 2. Set `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the project's publishable key.
 3. Set `NEXT_PUBLIC_SITE_URL` to the canonical deployed origin, for example `https://kasbeman.ir` only after that domain is actually connected to this application.
 4. In Supabase Auth URL Configuration, set the Site URL to the canonical origin and add the exact redirect URL `<origin>/auth/callback` to the allowed redirect URLs. Keep localhost callback URLs only for local development.
-5. Configure the production host's environment variables and redeploy.
+5. Configure the production host's runtime environment variables and redeploy.
 
 Email confirmation behavior depends on the project's Auth settings and email delivery configuration. With confirmation enabled, signup shows a notice and the user must follow the email link before a session is established.
+
+## Database migration boundary
+
+- Migration 1 (`identity_tenancy_foundation`) is applied. After signup and business creation, the expected database records are the Auth user, profile, active owner membership, business, and primary branch.
+- Migration 2 (`rbac_authorization_foundation`) is prepared and transaction-tested but **not applied**. Only after separate explicit approval and application should tests expect the three system roles, role permissions, and owner role assignment.
 
 ## Verification still required
 
 - CI typecheck, lint, and production build for the current branch head.
 - A real signup and email-confirmation round trip on the deployed host.
 - A real sign-in, sign-out, and session refresh round trip.
-- Create a first business and verify that the Auth user receives one profile, one active owner membership, one primary branch, three system roles, the expected role permissions, and one owner assignment.
+- With Migration 1 only: verify profile, active owner membership, business, and primary branch creation.
+- After Migration 2 is approved/applied: verify system roles, role permissions, owner assignment, and authorization audit behavior.
 - Verify that a second account cannot list or access the first account's business.
-- These live tests must use user-approved test accounts; no test accounts or persistent tenant records have been created by this implementation.
+- Live tests must use user-approved test accounts; no test accounts or persistent tenant records have been created by this implementation.
