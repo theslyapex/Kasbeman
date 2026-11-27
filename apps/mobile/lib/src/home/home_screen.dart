@@ -218,13 +218,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                         )
                                         .toList(),
                                     onChanged: (id) {
-                                      final next = branches
-                                          .where((branch) => branch.id == id)
-                                          .firstOrNull;
-                                      if (next != null) {
-                                        setState(
-                                          () => _selectedBranch = next,
-                                        );
+                                      for (final branch in branches) {
+                                        if (branch.id == id) {
+                                          setState(
+                                            () => _selectedBranch = branch,
+                                          );
+                                          break;
+                                        }
                                       }
                                     },
                                   ),
