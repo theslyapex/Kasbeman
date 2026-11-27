@@ -105,7 +105,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _selectBranch(String branchId) async {
-    setState(() => _selectedBranchId = branchId);
+    setState(() {
+      _selectedBranchId = branchId;
+      _branchesFuture = _loadBranches();
+    });
     try {
       await _selectionStore.write(
         userId: _userId,
