@@ -11,7 +11,7 @@ async function visit(directory) {
       await visit(file);
     } else if (entry.isFile() && file.endsWith(".sql")) {
       const source = await readFile(file, "utf8");
-      const counts = new Map();
+      if (/\\bas \\$(?=\\s|$)|^\\$(?:;|\\s*$)/m.test(source)) {\n        failures.push(`${path.relative(process.cwd(), file)}: invalid bare dollar delimiter`);\n      }\n      const counts = new Map();
       for (const match of source.matchAll(/\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/g)) {
         counts.set(match[0], (counts.get(match[0]) ?? 0) + 1);
       }

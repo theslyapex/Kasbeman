@@ -120,7 +120,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_created_by uuid;
 begin
@@ -142,7 +142,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 revoke all on function private.create_default_warehouse_for_branch() from public, anon, authenticated;
 create trigger branch_create_default_warehouse
   after insert on public.branches
@@ -425,7 +425,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_product_type text;
   v_product_status text;
@@ -518,7 +518,7 @@ create or replace function public.create_sale_draft(
 returns uuid
 language plpgsql
 set search_path = ''
-as $
+as $$
 declare
   v_user_id uuid := (select auth.uid());
   v_sale_id uuid;
@@ -621,7 +621,7 @@ begin
 
   return v_sale_id;
 end;
-$;
+$$;
 revoke all on function public.create_sale_draft(uuid, uuid, uuid, text, jsonb, uuid, text, text)
   from public, anon;
 grant execute on function public.create_sale_draft(uuid, uuid, uuid, text, jsonb, uuid, text, text)
@@ -708,7 +708,7 @@ grant execute on function public.record_customer_receipt(uuid, numeric, text, te
 
 -- Record a full reversal as a new immutable accounting event.
 create or replace function public.reverse_customer_receipt(p_receipt_id uuid, p_reason text)
-returns uuid language plpgsql security definer set search_path = '' as $
+returns uuid language plpgsql security definer set search_path = '' as $$
 declare
   v_user_id uuid := (select auth.uid());
   v_receipt public.customer_receipts%rowtype;
@@ -740,7 +740,7 @@ begin
     v_receipt.amount, v_reason, v_user_id) returning id into v_reversal_id;
   return v_reversal_id;
 end;
-$;
+$$;
 revoke all on function public.reverse_customer_receipt(uuid, text) from public, anon, authenticated;
 grant execute on function public.reverse_customer_receipt(uuid, text) to authenticated;
 
