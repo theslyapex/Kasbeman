@@ -22,6 +22,19 @@ jobs:
     name: Install, typecheck, lint and build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: kasbeman_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d kasbeman_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
 
     steps:
       - name: Checkout
@@ -47,6 +60,20 @@ jobs:
 
       - name: Validate sales/inventory SQL security structure
         run: node scripts/check-sales-inventory-security.mjs
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Run PostgreSQL 17 schema and tenant-isolation tests
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: kasbeman_test
+        run: bash scripts/test-postgres-schema.sh
 
       - name: vinext compatibility scan (non-migrating)
         working-directory: apps/web
