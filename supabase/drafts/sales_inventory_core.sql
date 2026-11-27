@@ -9,7 +9,9 @@ insert into public.permissions
   (permission_key, module_key, action_key, label_fa, description_fa, is_sensitive)
 values
   ('inventory.warehouses.read', 'inventory', 'warehouses_read', 'مشاهده انبارها', 'مشاهده انبارهای هر شعبه', false),
-  ('inventory.warehouses.manage', 'inventory', 'warehouses_manage', 'مدیریت انبارها', 'ایجاد و ویرایش انبارها', true)
+  ('inventory.warehouses.manage', 'inventory', 'warehouses_manage', 'مدیریت انبارها', 'ایجاد و ویرایش انبارها', true),
+  ('customers.read', 'customers', 'read', 'مشاهده مشتریان', 'مشاهده پرونده مشتریان کسب‌وکار', false),
+  ('customers.manage', 'customers', 'manage', 'مدیریت مشتریان', 'ایجاد و ویرایش پرونده مشتریان', true)
 on conflict (permission_key) do nothing;
 
 -- Newly introduced permissions are automatically assigned to protected owner
@@ -18,7 +20,10 @@ insert into public.role_permissions (business_id, role_id, permission_key)
 select r.business_id, r.id, p.permission_key
 from public.roles r
 join public.permissions p
-  on p.permission_key in ('inventory.warehouses.read', 'inventory.warehouses.manage')
+  on p.permission_key in (
+    'inventory.warehouses.read', 'inventory.warehouses.manage',
+    'customers.read', 'customers.manage'
+  )
 where r.is_system and r.role_key in ('owner', 'admin')
 on conflict do nothing;
 
@@ -199,6 +204,33 @@ create unique index stock_movements_reference_unique
   on public.stock_movements (business_id, reference_type, reference_id, product_id, movement_type)
   where reference_type is not null and reference_id is not null;
 
+-- Customer records belong to the business, not an individual branch.
+-- Purchase totals are derived from confirmed sales and are not stored redundantly.
+create table public.customers (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  name text not null,
+  phone text,
+  email text,
+  company_name text,
+  address text,
+  notes text,
+  status text not null default 'active',
+  created_by uuid not null references auth.users(id) on delete restrict,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint customers_name_length check (char_length(btrim(name)) between 2 and 160),
+  constraint customers_phone_length check (phone is null or char_length(btrim(phone)) <= 32),
+  constraint customers_email_length check (email is null or char_length(btrim(email)) <= 254),
+  constraint customers_status_check check (status in ('active', 'archived')),
+  constraint customers_business_id_id_unique unique (business_id, id)
+);
+
+create index customers_business_status_name_idx
+  on public.customers (business_id, status, name);
+create index customers_business_phone_idx
+  on public.customers (business_id, phone) where phone is not null;
+
 -- Sales are branch- and warehouse-bound. Drafts may be edited; confirmation
 -- atomically records stock-out movements and changes the sale state.
 create table public.sales (
@@ -207,6 +239,7 @@ create table public.sales (
   branch_id uuid not null,
   warehouse_id uuid not null,
   sale_number text not null,
+  customer_id uuid,
   customer_name text,
   status text not null default 'draft',
   subtotal numeric(18,2) not null default 0,
@@ -229,7 +262,10 @@ create table public.sales (
   constraint sales_number_unique_per_business unique (business_id, sale_number),
   constraint sales_branch_warehouse_fkey
     foreign key (business_id, branch_id, warehouse_id)
-    references public.warehouses (business_id, branch_id, id) on delete restrict
+    references public.warehouses (business_id, branch_id, id) on delete restrict,
+  constraint sales_customer_fkey
+    foreign key (business_id, customer_id)
+    references public.customers (business_id, id) on delete restrict
 );
 
 create index sales_business_branch_created_idx
@@ -353,12 +389,15 @@ create trigger stock_movement_apply_balance
 
 -- Create a draft and all of its lines in one transaction. Prices are read
 -- from the current product records; clients cannot submit arbitrary unit prices.
+drop function if exists public.create_sale_draft(uuid, uuid, uuid, text, jsonb, text, text);
+
 create or replace function public.create_sale_draft(
   p_business_id uuid,
   p_branch_id uuid,
   p_warehouse_id uuid,
   p_sale_number text,
   p_items jsonb,
+  p_customer_id uuid default null,
   p_customer_name text default null,
   p_notes text default null
 )
@@ -426,13 +465,26 @@ begin
     raise exception 'Item discount exceeds its amount' using errcode = '23514';
   end if;
 
+  if p_customer_id is not null and not exists (
+    select 1 from public.customers c
+    where c.business_id = p_business_id
+      and c.id = p_customer_id
+      and c.status = 'active'
+  ) then
+    raise exception 'Customer is unavailable for this business' using errcode = '22023';
+  end if;
+
   v_total := v_subtotal - v_discount + v_tax;
   insert into public.sales (
-    business_id, branch_id, warehouse_id, sale_number, customer_name,
+    business_id, branch_id, warehouse_id, sale_number, customer_id, customer_name,
     subtotal, discount_total, tax_total, grand_total, notes, created_by
   ) values (
-    p_business_id, p_branch_id, p_warehouse_id, p_sale_number,
-    nullif(btrim(p_customer_name), ''),
+    p_business_id, p_branch_id, p_warehouse_id, p_sale_number, p_customer_id,
+    coalesce(
+      (select c.name from public.customers c
+       where c.business_id = p_business_id and c.id = p_customer_id),
+      nullif(btrim(p_customer_name), '')
+    ),
     v_subtotal, v_discount, v_tax, v_total, nullif(btrim(p_notes), ''), v_user_id
   ) returning id into v_sale_id;
 
@@ -457,9 +509,9 @@ begin
 end;
 $;
 
-revoke all on function public.create_sale_draft(uuid, uuid, uuid, text, jsonb, text, text)
+revoke all on function public.create_sale_draft(uuid, uuid, uuid, text, jsonb, uuid, text, text)
   from public, anon;
-grant execute on function public.create_sale_draft(uuid, uuid, uuid, text, jsonb, text, text)
+grant execute on function public.create_sale_draft(uuid, uuid, uuid, text, jsonb, uuid, text, text)
   to authenticated;
 
 -- Confirmation is deliberately a narrowly-scoped SECURITY DEFINER endpoint:
@@ -600,12 +652,27 @@ $$;
 revoke all on function public.confirm_sale(uuid) from public, anon;
 grant execute on function public.confirm_sale(uuid) to authenticated;
 
+alter table public.customers enable row level security;
 alter table public.products enable row level security;
 alter table public.warehouses enable row level security;
 alter table public.stock_balances enable row level security;
 alter table public.stock_movements enable row level security;
 alter table public.sales enable row level security;
 alter table public.sale_items enable row level security;
+
+create policy customers_select_authorized on public.customers
+  for select to authenticated
+  using ((select private.has_business_permission(business_id, 'customers.read', null)));
+create policy customers_insert_authorized on public.customers
+  for insert to authenticated
+  with check (
+    created_by = (select auth.uid())
+    and (select private.has_business_permission(business_id, 'customers.manage', null))
+  );
+create policy customers_update_authorized on public.customers
+  for update to authenticated
+  using ((select private.has_business_permission(business_id, 'customers.manage', null)))
+  with check ((select private.has_business_permission(business_id, 'customers.manage', null)));
 
 create policy products_select_authorized on public.products
   for select to authenticated
@@ -725,9 +792,10 @@ create policy sale_items_delete_draft_authorized on public.sale_items
       and (select private.has_business_permission(s.business_id, 'sales.orders.manage', s.branch_id))
   ));
 
-revoke all on table public.products, public.warehouses, public.stock_balances,
+revoke all on table public.customers, public.products, public.warehouses, public.stock_balances,
   public.stock_movements, public.sales, public.sale_items from anon, authenticated;
 
+grant select, insert, update on table public.customers to authenticated;
 grant select, insert on table public.products to authenticated;
 grant update (sku, barcode, name, description, product_type, unit_name, sale_price, purchase_price, status)
   on table public.products to authenticated;
