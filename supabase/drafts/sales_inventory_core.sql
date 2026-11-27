@@ -280,6 +280,9 @@ create index sales_business_branch_created_idx
   on public.sales (business_id, branch_id, created_at desc);
 create index sales_business_status_created_idx
   on public.sales (business_id, status, created_at desc);
+create index sales_business_customer_created_idx
+  on public.sales (business_id, customer_id, created_at desc)
+  where customer_id is not null;
 
 create or replace view public.customer_purchase_summary
 with (security_invoker = true)
@@ -287,7 +290,7 @@ as
 select
   c.business_id,
   c.id as customer_id,
-  count(s.id) filter (where s.status = 'confirmed')::integer as purchase_count,
+  count(s.id) filter (where s.status = 'confirmed') as purchase_count,
   coalesce(sum(s.grand_total) filter (where s.status = 'confirmed'), 0)::numeric(18,2)
     as total_purchases
 from public.customers c
