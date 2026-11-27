@@ -67,11 +67,11 @@ wait_until_sleeping() {
 # Session A owns the balance row first; session B must re-check after A commits.
 PGAPPNAME=kasbeman-sale-a psql -X -v ON_ERROR_STOP=1 -Atq >"$tmp_dir/sale-a.log" 2>&1 <<SQL &
 BEGIN;
-SET ROLE authenticated;
-SET request.jwt.claim.sub = '$owner_id';
 SELECT 1 FROM public.stock_balances
  WHERE business_id = '$business_id' AND warehouse_id = '$warehouse_id'
    AND product_id = '$product_id' FOR UPDATE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '$owner_id';
 SELECT public.confirm_sale('$sale_a'::uuid);
 SELECT pg_sleep(2);
 COMMIT;
@@ -117,9 +117,9 @@ SQL
 # Concurrent idempotent receipt retries must return one shared receipt id.
 PGAPPNAME=kasbeman-receipt-a psql -X -v ON_ERROR_STOP=1 -Atq >"$tmp_dir/receipt-a.log" 2>&1 <<SQL &
 BEGIN;
+SELECT id FROM public.sales WHERE id = '$sale_a'::uuid FOR UPDATE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '$owner_id';
-SELECT id FROM public.sales WHERE id = '$sale_a'::uuid FOR UPDATE;
 SELECT pg_catalog.pg_advisory_xact_lock(
   pg_catalog.hashtextextended('$business_id:$receipt_key', 0)
 );
@@ -185,11 +185,11 @@ SQL
 
 PGAPPNAME=kasbeman-transfer-a psql -X -v ON_ERROR_STOP=1 -Atq >"$tmp_dir/transfer-a.log" 2>&1 <<SQL &
 BEGIN;
-SET ROLE authenticated;
-SET request.jwt.claim.sub = '$owner_id';
 SELECT 1 FROM public.stock_balances
  WHERE business_id = '$business_id' AND warehouse_id = '$warehouse_id'
    AND product_id = '$product_id' FOR UPDATE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '$owner_id';
 INSERT INTO public.stock_movements (
   business_id, movement_type, product_id, quantity,
   from_branch_id, from_warehouse_id, to_branch_id, to_warehouse_id,
