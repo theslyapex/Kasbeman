@@ -37,7 +37,7 @@ const immutableTables = ["customer_receipts", "customer_receipt_reversals", "sto
 for (const table of immutableTables) {
   const grants = [...sql.matchAll(new RegExp(`grant ([^;]+) on (?:table )?public\\.${table} to authenticated\\s*;`, "gi"))];
   for (const grant of grants) {
-    if (/\\b(insert|update|delete|truncate|references|trigger)\\b/i.test(grant[1])) {
+    if (/\b(insert|update|delete|truncate|references|trigger)\b/i.test(grant[1])) {
       failures.push(`${table}: direct mutation grant found (${grant[1]})`);
     }
   }
