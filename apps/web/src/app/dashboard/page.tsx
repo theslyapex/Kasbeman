@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type DashboardPageProps = { searchParams: Promise<{ created?: string }> };
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "فضای کاری" };
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
