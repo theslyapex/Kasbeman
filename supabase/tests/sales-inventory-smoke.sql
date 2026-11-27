@@ -106,6 +106,17 @@ SELECT public.create_sale_draft(
 ) AS sale_id \gset
 
 SELECT public.confirm_sale(:'sale_id'::uuid);
+
+-- Re-confirming a confirmed sale must fail without a second stock deduction.
+DO $ 
+BEGIN
+  BEGIN
+    PERFORM public.confirm_sale(:'sale_id'::uuid);
+    RAISE EXCEPTION 'Confirmed sale was processed twice';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
+END
+$;
 SELECT public.record_customer_receipt(:'sale_id'::uuid, 50, 'cash') AS receipt_id \gset
 SELECT set_config('kasbeman.test_sale_id', :'sale_id', false);
 
@@ -126,6 +137,80 @@ END
 $$;
 
 SELECT public.reverse_customer_receipt(:'receipt_id'::uuid, 'CI reversal test');
+
+-- A receipt can have only one immutable reversal record.
+DO $
+BEGIN
+  BEGIN
+    PERFORM public.reverse_customer_receipt(:'receipt_id'::uuid, 'Duplicate reversal must fail');
+    RAISE EXCEPTION 'Receipt reversal was accepted twice';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+END
+$;
+
+-- Transfer stock between branches as one atomic movement.
+INSERT INTO public.stock_movements (
+  business_id, movement_type, product_id, quantity,
+  from_branch_id, from_warehouse_id, to_branch_id, to_warehouse_id,
+  reference_type, reference_id, created_by, note
+) VALUES (
+  :'business_id'::uuid, 'transfer', :'product_id'::uuid, 3,
+  :'branch_id'::uuid, :'warehouse_id'::uuid,
+  :'second_branch_id'::uuid, :'second_warehouse_id'::uuid,
+  'ci_transfer', '20000000-0000-4000-8000-000000000001',
+  auth.uid(), 'CI inter-branch transfer'
+);
+
+DO $
+BEGIN
+  IF (SELECT quantity_on_hand FROM public.stock_balances
+      WHERE warehouse_id = current_setting('kasbeman.test_warehouse_id')::uuid
+        AND product_id = current_setting('kasbeman.test_product_id')::uuid) <> 5 THEN
+    RAISE EXCEPTION 'Transfer did not deduct source warehouse stock';
+  END IF;
+  IF (SELECT quantity_on_hand FROM public.stock_balances
+      WHERE warehouse_id = current_setting('kasbeman.test_second_warehouse_id')::uuid
+        AND product_id = current_setting('kasbeman.test_product_id')::uuid) <> 7 THEN
+    RAISE EXCEPTION 'Transfer did not add destination warehouse stock';
+  END IF;
+END
+$;
+
+-- Replaying the same reference must not apply the transfer a second time.
+DO $
+BEGIN
+  BEGIN
+    INSERT INTO public.stock_movements (
+      business_id, movement_type, product_id, quantity,
+      from_branch_id, from_warehouse_id, to_branch_id, to_warehouse_id,
+      reference_type, reference_id, created_by, note
+    ) VALUES (
+      :'business_id'::uuid, 'transfer', :'product_id'::uuid, 3,
+      :'branch_id'::uuid, :'warehouse_id'::uuid,
+      :'second_branch_id'::uuid, :'second_warehouse_id'::uuid,
+      'ci_transfer', '20000000-0000-4000-8000-000000000001',
+      auth.uid(), 'duplicate CI transfer'
+    );
+    RAISE EXCEPTION 'Duplicate stock transfer reference was accepted';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+END
+$;
+
+DO $
+BEGIN
+  IF (SELECT quantity_on_hand FROM public.stock_balances
+      WHERE warehouse_id = current_setting('kasbeman.test_warehouse_id')::uuid
+        AND product_id = current_setting('kasbeman.test_product_id')::uuid) <> 5
+     OR
+     (SELECT quantity_on_hand FROM public.stock_balances
+      WHERE warehouse_id = current_setting('kasbeman.test_second_warehouse_id')::uuid
+        AND product_id = current_setting('kasbeman.test_product_id')::uuid) <> 7 THEN
+    RAISE EXCEPTION 'Duplicate transfer changed warehouse balances';
+  END IF;
+END
+$;
 
 DO $$
 BEGIN
@@ -250,4 +335,4 @@ END
 $$;
 
 RESET ROLE;
-SELECT 'PostgreSQL 17: schema, sales, stock, receipts, reversals, insufficient-stock rollback, branch-scoped RBAC, read-only enforcement, and cross-tenant isolation passed.' AS result;
+SELECT 'PostgreSQL 17: schema, sales, idempotent confirmation, stock transfers, duplicate-transfer protection, receipts, duplicate-reversal protection, insufficient-stock rollback, branch-scoped RBAC, read-only enforcement, and cross-tenant isolation passed.' AS result;
