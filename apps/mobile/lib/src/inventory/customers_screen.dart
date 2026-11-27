@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'inventory_repository.dart';
 import 'customer_statement_exporter.dart';
+import 'pending_receipt_store.dart';
 
 class CustomersScreen extends StatefulWidget {
   const CustomersScreen({
@@ -23,6 +24,7 @@ class CustomersScreen extends StatefulWidget {
 class _CustomersScreenState extends State<CustomersScreen> {
   final _search = TextEditingController();
   final Map<String, Future<List<_CustomerLedgerEntry>>> _ledgerHistory = {};
+  final PendingReceiptStore _pendingReceipts = PendingReceiptStore();
   final Set<String> _expandedCustomers = {};
   bool _showArchived = false;
   String? _exportingCustomerId;
@@ -174,13 +176,33 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   Future<void> _recordReceipt(CustomerRecord customer) async {
     try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('برای ثبت دریافت ابتدا وارد حساب شو.')),
+        );
+        return;
+      }
+      final pending = await _pendingReceipts.read(
+        userId: userId,
+        businessId: widget.businessId,
+        customerId: customer.id,
+      );
       final invoices = await widget.repository.fetchCustomerSales(
         businessId: widget.businessId,
         customerId: customer.id,
       );
       if (!mounted) return;
-      final unpaid = invoices.where((sale) => sale.balanceDue > 0).toList();
-      if (unpaid.isEmpty) {
+      if (pending != null && !invoices.any((sale) => sale.id == pending.saleId)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('درخواست دریافت معلق پیدا شد، اما فاکتور آن در دسترس نیست؛ اطلاعات امن حذف نشده است.')),
+        );
+        return;
+      }
+      final availableInvoices = pending == null
+          ? invoices.where((sale) => sale.balanceDue > 0).toList()
+          : invoices;
+      if (availableInvoices.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('برای این مشتری فاکتور تأییدشده با مانده باز وجود ندارد.')),
         );
@@ -194,12 +216,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
         builder: (_) => _CustomerReceiptForm(
           repository: widget.repository,
           customer: customer,
-          invoices: unpaid,
+          invoices: availableInvoices,
+          businessId: widget.businessId,
+          userId: userId,
+          pendingStore: _pendingReceipts,
+          pendingRequest: pending,
         ),
       );
       if (saved == true && mounted) {
         _ledgerHistory.remove(customer.id);
-        
         setState(_load);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('دریافت وجه ثبت شد.')),
@@ -215,7 +240,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ارتباط با سرور برقرار نشد.')),
+        const SnackBar(content: Text('بازیابی درخواست یا دریافت فاکتورها انجام نشد؛ فضای ذخیره امن و اتصال را بررسی کن.')),
       );
     }
   }
@@ -981,11 +1006,19 @@ class _CustomerReceiptForm extends StatefulWidget {
     required this.repository,
     required this.customer,
     required this.invoices,
+    required this.businessId,
+    required this.userId,
+    required this.pendingStore,
+    required this.pendingRequest,
   });
 
   final InventoryRepository repository;
   final CustomerRecord customer;
   final List<SaleRecord> invoices;
+  final String businessId;
+  final String userId;
+  final PendingReceiptStore pendingStore;
+  final PendingReceiptRequest? pendingRequest;
 
   @override
   State<_CustomerReceiptForm> createState() => _CustomerReceiptFormState();
@@ -999,6 +1032,7 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
   late String _saleId;
   String _method = 'cash';
   String _idempotencyKey = _newReceiptRequestId();
+  PendingReceiptRequest? _pendingRequest;
   bool _saving = false;
   bool _requestOutcomeUnknown = false;
 
@@ -1008,8 +1042,19 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
   @override
   void initState() {
     super.initState();
-    _saleId = widget.invoices.first.id;
-    _amount.text = _selectedInvoice.balanceDue.toStringAsFixed(0);
+    _pendingRequest = widget.pendingRequest;
+    final pending = _pendingRequest;
+    _saleId = pending?.saleId ?? widget.invoices.first.id;
+    if (pending == null) {
+      _amount.text = _selectedInvoice.balanceDue.toStringAsFixed(0);
+    } else {
+      _idempotencyKey = pending.idempotencyKey;
+      _amount.text = pending.amount.toString();
+      _method = pending.paymentMethod;
+      _reference.text = pending.reference ?? '';
+      _notes.text = pending.notes ?? '';
+      _requestOutcomeUnknown = true;
+    }
   }
 
   @override
@@ -1032,12 +1077,12 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-    final amount = _parseAmount();
-    if (amount == null) return;
-    setState(() => _saving = true);
-    try {
-      await widget.repository.recordCustomerReceipt(
+    var request = _pendingRequest;
+    if (request == null) {
+      if (!_formKey.currentState!.validate()) return;
+      final amount = _parseAmount();
+      if (amount == null) return;
+      request = PendingReceiptRequest(
         saleId: _saleId,
         amount: amount,
         paymentMethod: _method,
@@ -1045,26 +1090,77 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
         reference: _reference.text,
         notes: _notes.text,
       );
+      try {
+        await widget.pendingStore.save(
+          userId: widget.userId,
+          businessId: widget.businessId,
+          customerId: widget.customer.id,
+          request: request,
+        );
+        _pendingRequest = request;
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ذخیره امن درخواست ممکن نشد؛ برای جلوگیری از ثبت تکراری، درخواست ارسال نشد.')),
+        );
+        return;
+      }
+    }
+
+    setState(() => _saving = true);
+    try {
+      await widget.repository.recordCustomerReceipt(
+        saleId: request.saleId,
+        amount: request.amount,
+        paymentMethod: request.paymentMethod,
+        idempotencyKey: request.idempotencyKey,
+        reference: request.reference,
+        notes: request.notes,
+      );
+      await widget.pendingStore.clear(
+        userId: widget.userId,
+        businessId: widget.businessId,
+        customerId: widget.customer.id,
+      );
       if (mounted) Navigator.of(context).pop(true);
     } on PostgrestException catch (error) {
-      // A database error response means the transaction rolled back.
-      _idempotencyKey = _newReceiptRequestId();
-      _requestOutcomeUnknown = false;
+      if (_isDefinitiveReceiptRejection(error.code)) {
+        try {
+          await widget.pendingStore.clear(
+            userId: widget.userId,
+            businessId: widget.businessId,
+            customerId: widget.customer.id,
+          );
+          _pendingRequest = null;
+          _idempotencyKey = _newReceiptRequestId();
+          _requestOutcomeUnknown = false;
+        } catch (_) {
+          _requestOutcomeUnknown = true;
+        }
+      } else {
+        _requestOutcomeUnknown = true;
+      }
       if (!mounted) return;
       final message = error.code == '42501'
           ? 'مجوز ثبت دریافت وجه را نداری.'
-          : 'ثبت دریافت انجام نشد؛ مانده فاکتور را دوباره بررسی کن.';
+          : _requestOutcomeUnknown
+              ? 'نتیجه درخواست قطعی نیست؛ فقط همان درخواست ذخیره‌شده را دوباره ارسال کن.'
+              : 'ثبت دریافت انجام نشد؛ اطلاعات را اصلاح و دوباره تلاش کن.';
+      setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } catch (_) {
       if (!mounted) return;
       setState(() => _requestOutcomeUnknown = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('نتیجه درخواست مشخص نیست؛ برای جلوگیری از ثبت تکراری، فقط همان درخواست را دوباره ارسال کن.')),
+        const SnackBar(content: Text('نتیجه درخواست مشخص نیست؛ اطلاعات امن نگه داشته شد. فقط همان درخواست را دوباره ارسال کن.')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
+
+  bool _isDefinitiveReceiptRejection(String code) =>
+      const {'22023', '23514', '42501', '28000', 'P0002', '23505'}.contains(code);
 
   @override
   Widget build(BuildContext context) {
