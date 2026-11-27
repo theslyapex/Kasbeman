@@ -102,6 +102,7 @@ void main() {
         home: WorkspaceScreen(
           email: 'user@example.com',
           repository: repository,
+          branchSelectionStore: _FakeBranchSelectionStore(),
         ),
       ),
     );
