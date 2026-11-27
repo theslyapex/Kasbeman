@@ -222,6 +222,8 @@ create table public.sales (
   constraint sales_status_check check (status in ('draft', 'confirmed', 'cancelled')),
   constraint sales_amounts_nonnegative check (
     subtotal >= 0 and discount_total >= 0 and tax_total >= 0 and grand_total >= 0
+    and discount_total <= subtotal
+    and grand_total = subtotal - discount_total + tax_total
   ),
   constraint sales_business_id_id_unique unique (business_id, id),
   constraint sales_number_unique_per_business unique (business_id, sale_number),
@@ -251,6 +253,8 @@ create table public.sale_items (
   constraint sale_items_quantity_positive check (quantity > 0),
   constraint sale_items_amounts_nonnegative check (
     unit_price >= 0 and discount_amount >= 0 and tax_amount >= 0 and line_total >= 0
+    and discount_amount <= round(quantity * unit_price, 2)
+    and line_total = round(quantity * unit_price, 2) - discount_amount + tax_amount
   ),
   constraint sale_items_name_length check (char_length(btrim(product_name_snapshot)) between 1 and 180),
   constraint sale_items_sale_fkey
@@ -341,6 +345,52 @@ begin
 
   if v_sale.status <> 'draft' then
     raise exception 'Only draft sales can be confirmed' using errcode = '22023';
+  end if;
+
+  if not exists (
+    select 1
+    from public.branches br
+    join public.warehouses w
+      on w.business_id = br.business_id
+     and w.branch_id = br.id
+     and w.id = v_sale.warehouse_id
+    where br.business_id = v_sale.business_id
+      and br.id = v_sale.branch_id
+      and br.status = 'active'
+      and w.status = 'active'
+  ) then
+    raise exception 'The sale branch or warehouse is inactive' using errcode = '22023';
+  end if;
+
+  if exists (
+    select 1
+    from public.sale_items si
+    join public.products p
+      on p.business_id = si.business_id and p.id = si.product_id
+    where si.business_id = v_sale.business_id
+      and si.sale_id = v_sale.id
+      and p.status <> 'active'
+  ) then
+    raise exception 'Archived products cannot be sold' using errcode = '22023';
+  end if;
+
+  if exists (
+    select 1
+    from (
+      select
+        coalesce(sum(round(si.quantity * si.unit_price, 2)), 0)::numeric(18,2) as subtotal,
+        coalesce(sum(si.discount_amount), 0)::numeric(18,2) as discount_total,
+        coalesce(sum(si.tax_amount), 0)::numeric(18,2) as tax_total,
+        coalesce(sum(si.line_total), 0)::numeric(18,2) as grand_total
+      from public.sale_items si
+      where si.business_id = v_sale.business_id and si.sale_id = v_sale.id
+    ) totals
+    where totals.subtotal <> v_sale.subtotal
+       or totals.discount_total <> v_sale.discount_total
+       or totals.tax_total <> v_sale.tax_total
+       or totals.grand_total <> v_sale.grand_total
+  ) then
+    raise exception 'Sale totals do not match its items' using errcode = '23514';
   end if;
 
   if not exists (
