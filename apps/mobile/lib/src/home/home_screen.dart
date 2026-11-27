@@ -351,12 +351,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                       !result.permissions.contains('inventory.stock.read'))
                                     const Padding(
                                       padding: EdgeInsets.only(top: 8),
-                                      child: Text(
+                                      child: const Text(
                                         !_inventoryModuleEnabled
                                             ? 'این ماژول پس از آماده‌سازی دیتابیس و فعال‌سازی نسخه عملیاتی در دسترس قرار می‌گیرد.'
                                             : 'برای مشاهده این بخش، مجوزهای لازم در فضای کاری شما فعال نیست.',
                                         textAlign: TextAlign.center,
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           color: Colors.white54,
                                           fontSize: 12,
                                         ),
