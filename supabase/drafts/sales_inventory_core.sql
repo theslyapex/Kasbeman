@@ -351,6 +351,116 @@ create trigger stock_movement_apply_balance
   after insert on public.stock_movements
   for each row execute function private.apply_stock_movement();
 
+-- Create a draft and all of its lines in one transaction. Prices are read
+-- from the current product records; clients cannot submit arbitrary unit prices.
+create or replace function public.create_sale_draft(
+  p_business_id uuid,
+  p_branch_id uuid,
+  p_warehouse_id uuid,
+  p_sale_number text,
+  p_items jsonb,
+  p_customer_name text default null,
+  p_notes text default null
+)
+returns uuid
+language plpgsql
+set search_path = ''
+as $
+declare
+  v_user_id uuid := (select auth.uid());
+  v_sale_id uuid;
+  v_item_count integer;
+  v_valid_count integer;
+  v_subtotal numeric(18,2);
+  v_discount numeric(18,2);
+  v_tax numeric(18,2);
+  v_total numeric(18,2);
+begin
+  if v_user_id is null then
+    raise exception 'Authentication required' using errcode = '28000';
+  end if;
+  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
+    raise exception 'A sale must contain at least one item' using errcode = '22023';
+  end if;
+
+  select count(*) into v_item_count
+  from jsonb_to_recordset(p_items) as i(
+    product_id uuid, quantity numeric, discount_amount numeric, tax_amount numeric
+  );
+
+  if exists (
+    select 1
+    from jsonb_to_recordset(p_items) as i(
+      product_id uuid, quantity numeric, discount_amount numeric, tax_amount numeric
+    )
+    where i.product_id is null or i.quantity is null or i.quantity <= 0
+       or coalesce(i.discount_amount, 0) < 0 or coalesce(i.tax_amount, 0) < 0
+  ) then
+    raise exception 'Invalid sale item values' using errcode = '22023';
+  end if;
+
+  select count(*),
+    coalesce(sum(round(i.quantity * p.sale_price, 2)), 0)::numeric(18,2),
+    coalesce(sum(coalesce(i.discount_amount, 0)), 0)::numeric(18,2),
+    coalesce(sum(coalesce(i.tax_amount, 0)), 0)::numeric(18,2)
+  into v_valid_count, v_subtotal, v_discount, v_tax
+  from jsonb_to_recordset(p_items) as i(
+    product_id uuid, quantity numeric, discount_amount numeric, tax_amount numeric
+  )
+  join public.products p
+    on p.business_id = p_business_id and p.id = i.product_id
+   and p.status = 'active';
+
+  if v_valid_count <> v_item_count then
+    raise exception 'One or more products are unavailable' using errcode = '22023';
+  end if;
+  if exists (
+    select 1
+    from jsonb_to_recordset(p_items) as i(
+      product_id uuid, quantity numeric, discount_amount numeric, tax_amount numeric
+    )
+    join public.products p on p.business_id = p_business_id and p.id = i.product_id
+    where coalesce(i.discount_amount, 0) > round(i.quantity * p.sale_price, 2)
+  ) then
+    raise exception 'Item discount exceeds its amount' using errcode = '23514';
+  end if;
+
+  v_total := v_subtotal - v_discount + v_tax;
+  insert into public.sales (
+    business_id, branch_id, warehouse_id, sale_number, customer_name,
+    subtotal, discount_total, tax_total, grand_total, notes, created_by
+  ) values (
+    p_business_id, p_branch_id, p_warehouse_id, p_sale_number,
+    nullif(btrim(p_customer_name), ''),
+    v_subtotal, v_discount, v_tax, v_total, nullif(btrim(p_notes), ''), v_user_id
+  ) returning id into v_sale_id;
+
+  insert into public.sale_items (
+    business_id, sale_id, product_id, product_name_snapshot, sku_snapshot,
+    quantity, unit_price, discount_amount, tax_amount, line_total
+  )
+  select
+    p_business_id, v_sale_id, p.id, p.name, p.sku,
+    i.quantity, p.sale_price, coalesce(i.discount_amount, 0),
+    coalesce(i.tax_amount, 0),
+    round(i.quantity * p.sale_price, 2) - coalesce(i.discount_amount, 0)
+      + coalesce(i.tax_amount, 0)
+  from jsonb_to_recordset(p_items) as i(
+    product_id uuid, quantity numeric, discount_amount numeric, tax_amount numeric
+  )
+  join public.products p
+    on p.business_id = p_business_id and p.id = i.product_id
+   and p.status = 'active';
+
+  return v_sale_id;
+end;
+$;
+
+revoke all on function public.create_sale_draft(uuid, uuid, uuid, text, jsonb, text, text)
+  from public, anon;
+grant execute on function public.create_sale_draft(uuid, uuid, uuid, text, jsonb, text, text)
+  to authenticated;
+
 -- Confirmation is deliberately a narrowly-scoped SECURITY DEFINER endpoint:
 -- it checks the live user's sales + stock permissions before bypassing table RLS.
 create or replace function public.confirm_sale(p_sale_id uuid)
