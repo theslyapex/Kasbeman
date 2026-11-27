@@ -166,6 +166,49 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                 ],
                               ),
                             ),
+                            FutureBuilder<List<SaleRecord>>(
+                              future: widget.repository.fetchCustomerSales(
+                                businessId: widget.businessId,
+                                customerId: customer.id,
+                              ),
+                              builder: (context, history) {
+                                if (history.connectionState == ConnectionState.waiting) {
+                                  return const Padding(
+                                    padding: EdgeInsets.all(14),
+                                    child: Center(child: CircularProgressIndicator()),
+                                  );
+                                }
+                                if (history.hasError) {
+                                  return const ListTile(
+                                    dense: true,
+                                    title: Text('سابقه خرید در دسترس نیست'),
+                                  );
+                                }
+                                final purchases = history.data ?? const <SaleRecord>[];
+                                if (purchases.isEmpty) {
+                                  return const ListTile(
+                                    dense: true,
+                                    title: Text('هنوز خرید تأییدشده‌ای ثبت نشده است.'),
+                                  );
+                                }
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    const Padding(
+                                      padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                                      child: Text('سوابق خرید', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    ),
+                                    ...purchases.map((sale) => ListTile(
+                                      dense: true,
+                                      leading: const Icon(Icons.receipt_long_outlined),
+                                      title: Text(sale.saleNumber),
+                                      subtitle: Text('${sale.items.length} قلم • ${_date(sale.createdAt)}'),
+                                      trailing: Text('${_money(sale.grandTotal)} تومان'),
+                                    )),
+                                  ],
+                                );
+                              },
+                            ),
                           ],
                         ),
                       );
@@ -318,6 +361,11 @@ class _CustomerFormState extends State<_CustomerForm> {
       ),
     );
   }
+}
+
+String _date(DateTime value) {
+  final local = value.toLocal();
+  return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')}';
 }
 
 String _money(num value) => value.toStringAsFixed(0).replaceAllMapped(
