@@ -70,6 +70,12 @@ abstract interface class WorkspaceRepository {
 
   Future<List<BusinessBranch>> fetchBranches(String businessId);
 
+  Future<Set<String>> fetchPermissions({
+    required String businessId,
+    required String userId,
+    required String? branchId,
+  });
+
   Future<String> createBranch({
     required String businessId,
     required String name,
@@ -148,6 +154,39 @@ class SupabaseWorkspaceRepository implements WorkspaceRepository {
           ),
         )
         .toList(growable: false);
+  }
+
+  @override
+  Future<Set<String>> fetchPermissions({
+    required String businessId,
+    required String userId,
+    required String? branchId,
+  }) async {
+    final assignments = await _client
+        .from('member_role_assignments')
+        .select('role_id,branch_id')
+        .eq('business_id', businessId)
+        .eq('user_id', userId)
+        .eq('status', 'active');
+
+    final roleIds = assignments
+        .where((row) =>
+            row['branch_id'] == null || row['branch_id'] == branchId)
+        .map((row) => row['role_id'] as String)
+        .toSet()
+        .toList(growable: false);
+
+    if (roleIds.isEmpty) return const <String>{};
+
+    final rows = await _client
+        .from('role_permissions')
+        .select('permission_key')
+        .eq('business_id', businessId)
+        .inFilter('role_id', roleIds);
+
+    return rows
+        .map((row) => row['permission_key'] as String)
+        .toSet();
   }
 
   @override

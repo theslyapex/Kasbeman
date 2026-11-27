@@ -37,18 +37,18 @@ class _BranchLoadResult {
   const _BranchLoadResult({
     required this.branches,
     required this.preferredBranchId,
+    required this.permissions,
   });
 
   final List<BusinessBranch> branches;
   final String? preferredBranchId;
+  final Set<String> permissions;
 }
 
 class _HomeScreenState extends State<HomeScreen> {
   late Future<_BranchLoadResult> _branchesFuture;
   late final BranchSelectionStore _selectionStore;
   String? _selectedBranchId;
-
-  bool get _canManageBranches => widget.membership.roleKey == 'owner';
 
   String get _userId => widget.userId;
 
@@ -80,9 +80,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? branches.first.id
                 : null;
 
+    final activeBranchId = _selectedBranchId ?? preferred;
+    final permissions = await widget.repository.fetchPermissions(
+      businessId: widget.membership.businessId,
+      userId: _userId,
+      branchId: activeBranchId,
+    );
+
     return _BranchLoadResult(
       branches: branches,
-      preferredBranchId: _selectedBranchId ?? preferred,
+      preferredBranchId: activeBranchId,
+      permissions: permissions,
     );
   }
 
@@ -308,7 +316,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                     ),
                                   ],
-                                  if (_canManageBranches) ...[
+                                  if (result.permissions.contains('branches.manage')) ...[
                                     const SizedBox(height: 12),
                                     OutlinedButton.icon(
                                       onPressed: _createBranch,
@@ -320,7 +328,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   const Divider(color: Colors.white12),
                                   const SizedBox(height: 8),
                                   FilledButton.icon(
-                                    onPressed: _inventoryModuleEnabled
+                                    onPressed: _inventoryModuleEnabled &&
+                                            result.permissions.contains('inventory.items.read') &&
+                                            result.permissions.contains('inventory.stock.read')
                                         ? () => Navigator.of(context).push(
                                               MaterialPageRoute<void>(
                                                 builder: (_) => InventoryScreen(
@@ -333,11 +343,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                     icon: const Icon(Icons.inventory_2_outlined),
                                     label: const Text('مدیریت کالا و انبار'),
                                   ),
-                                  if (!_inventoryModuleEnabled)
-                                    const Padding(
-                                      padding: EdgeInsets.only(top: 8),
+                                  if (!_inventoryModuleEnabled ||
+                                      !result.permissions.contains('inventory.items.read') ||
+                                      !result.permissions.contains('inventory.stock.read'))
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
                                       child: Text(
-                                        'پس از تأیید و نصب مهاجرت دیتابیس فعال می‌شود.',
+                                        !_inventoryModuleEnabled
+                                            ? 'این ماژول پس از آماده‌سازی دیتابیس و فعال‌سازی نسخه عملیاتی در دسترس قرار می‌گیرد.'
+                                            : 'برای مشاهده این بخش، مجوزهای لازم در فضای کاری شما فعال نیست.',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           color: Colors.white54,
