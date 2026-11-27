@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/src/inventory/customer_statement_exporter.dart';
-import '../lib/src/inventory/inventory_repository.dart';
+import 'package:kasbeman_mobile/src/inventory/customer_statement_exporter.dart';
+import 'package:kasbeman_mobile/src/inventory/inventory_repository.dart';
 
 void main() {
   test('statement calculates opening, period totals and closing balance', () {
-    final customer = CustomerRecord(
+    const customer = CustomerRecord(
       id: 'customer-1',
       businessId: 'business-1',
       name: 'مشتری آزمایشی',
@@ -21,7 +21,7 @@ void main() {
       balanceDue: 1200,
     );
     final sales = [
-      SaleRecord(
+      const SaleRecord(
         id: 'sale-before',
         saleNumber: '100',
         customerName: customer.name,
@@ -43,7 +43,7 @@ void main() {
       ),
     ];
     final receipts = [
-      CustomerReceiptRecord(
+      const CustomerReceiptRecord(
         id: 'receipt-before',
         saleNumber: '100',
         amount: 200,
