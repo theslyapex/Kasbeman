@@ -1,6 +1,7 @@
 # Database foundation: tenant-scoped RBAC
 
-- Status: prepared and transaction-tested; **not applied** to the hosted Supabase project
+- Status: **applied** to the hosted Supabase project on 2026-11-27; transaction-tested before deployment
+- Recorded Supabase migration version: `20261127085000`
 - Target: PostgreSQL 17 / Supabase Auth
 - Depends on: `20261127080500_identity_tenancy_foundation.sql`
 - Migration: `supabase/migrations/20261127083000_rbac_authorization_foundation.sql`
@@ -81,3 +82,30 @@ The complete migration was executed inside a transaction and rolled back against
 - rollback leaves no test Auth users, tenants, or RBAC schema objects behind.
 
 This test validates the migration SQL and the tested authorization paths. It does not mean the migration has been applied or that every future module's RLS is already implemented.
+
+
+## Hosted deployment verification (2026-11-27)
+
+The migration was applied to Supabase project `xitrazjbemmkarawejfe`. Supabase recorded it as version `20261127085000` under name `rbac_authorization_foundation`.
+
+Read-only verification confirmed:
+
+- All four RBAC tables exist and have RLS enabled: `permissions`, `roles`, `role_permissions`, and `member_role_assignments`.
+- The global permission catalogue contains 36 entries.
+- No businesses, roles, role grants, or member-role assignments existed at verification time. This is expected because no test or production tenant data had been created.
+- The permission helpers are in the private schema, use `SECURITY DEFINER` with an empty `search_path`, are executable by `authenticated`, and are not executable by `anon`.
+- The authorization audit triggers exist for roles, role permissions, role assignments, and membership status changes.
+- `public.create_business(text,text)` was replaced with the atomic bootstrap that also creates system roles, grants, and the owner's role assignment. It requires `auth.uid()`; execution is denied to `anon` and granted to `authenticated`.
+- Migration history contains both the identity/tenancy foundation and this RBAC migration.
+
+### Advisor results after deployment
+
+- Health advisor: no findings.
+- Security advisor: one warning for the intentionally callable `public.create_business` SECURITY DEFINER RPC. It is an authenticated-only endpoint, checks `auth.uid()`, validates inputs, and is required for atomic tenant bootstrap. This warning is documented rather than treated as a clean security scan.
+- Security advisor also reports that `private.authorization_audit_log` has RLS enabled with no policies. This is intentional: it has no direct grants to `anon` or `authenticated`; an audited, scoped read path is deferred.
+- Performance advisor reports six unindexed foreign keys: `business_invitations.invited_by`, `businesses.created_by`, `member_role_assignments.assigned_by`, `member_role_assignments.branch_id`, `member_role_assignments.role_id`, and `roles.created_by`. These are optimization findings, not migration failures; index additions should be handled in a new migration.
+- The advisor also lists five indexes as unused because the database is currently empty. Reassess after representative tenant data and workloads exist.
+
+The transaction tests completed before deployment cover tenant isolation, branch scope, role escalation prevention, owner protections, suspension behavior, and rollback. No persistent test users or tenants were created. Live authenticated end-to-end tests remain outstanding.
+
+This migration establishes the shared RBAC foundation only. Future module tables still require their own tenant- and branch-aware RLS policies and tests.
