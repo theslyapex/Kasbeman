@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../workspace/workspace_repository.dart';
 import 'inventory_repository.dart';
 import 'inventory_movement_screen.dart';
+import 'inventory_history_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({
@@ -43,6 +44,18 @@ class _InventoryScreenState extends State<InventoryScreen>
     _balancesFuture = _repository.fetchBalances(
       businessId: widget.membership.businessId,
       branchId: widget.branch.id,
+    );
+  }
+
+  Future<void> _openHistory() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => InventoryHistoryScreen(
+          membership: widget.membership,
+          branch: widget.branch,
+          repository: _repository,
+        ),
+      ),
     );
   }
 
@@ -102,6 +115,11 @@ class _InventoryScreenState extends State<InventoryScreen>
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'تاریخچه گردش',
+            onPressed: _openHistory,
+            icon: const Icon(Icons.history),
+          ),
           IconButton(
             tooltip: 'ثبت گردش موجودی',
             onPressed: _openMovements,
