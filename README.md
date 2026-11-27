@@ -6,7 +6,7 @@
 
 ## Project status
 
-The repository foundation is being established. The web workspace skeleton is present; database migrations, authentication flows, and production deployments are not yet implemented.
+The web workspace includes the initial Supabase Auth flow (email/password signup, login, email confirmation callback), a protected workspace dashboard, and atomic business creation. Identity/tenancy and RBAC foundation migrations have been applied to the hosted Supabase project; module-specific authorization and production deployment remain in progress.
 
 ## Architecture principles
 
@@ -30,11 +30,11 @@ The repository foundation is being established. The web workspace skeleton is pr
 
 1. Install Node.js 22.12+ and pnpm 10+.
 2. Run `pnpm install` from the repository root.
-3. Copy `/.env.example` to `/.env.local` inside `apps/web` and provide the Supabase project URL and publishable key.
+3. Copy `/.env.example` to `apps/web/.env.local` and provide the Supabase project URL and publishable key.
 4. Run `pnpm --filter @kasbeman/web dev`.
 
 Do not put Supabase secret keys in browser-visible environment variables.
 
 ## Current limitations
 
-This is an initial scaffold, not a deployed product. No database schema or migrations have been applied to the hosted Supabase project.
+This is an initial scaffold, not a deployed product. The hosted project has the identity/tenancy and RBAC foundation migrations applied. The web app still requires environment configuration and Supabase Auth redirect URL setup before live signup can be tested.
