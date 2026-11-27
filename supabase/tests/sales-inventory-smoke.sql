@@ -27,6 +27,55 @@ INSERT INTO public.stock_movements (
   :'branch_id'::uuid, :'warehouse_id'::uuid, auth.uid(), 'CI seed stock'
 );
 
+-- Create a second branch. Its default warehouse is created by the branch trigger.
+INSERT INTO public.branches (business_id, name, code)
+VALUES (:'business_id'::uuid, 'شعبه دوم', 'BR-02')
+RETURNING id AS second_branch_id \\gset
+SELECT id AS second_warehouse_id
+FROM public.warehouses
+WHERE business_id = :'business_id'::uuid
+  AND branch_id = :'second_branch_id'::uuid
+  AND is_default \\gset
+
+INSERT INTO public.stock_movements (
+  business_id, movement_type, product_id, quantity,
+  to_branch_id, to_warehouse_id, created_by, note
+) VALUES (
+  :'business_id'::uuid, 'in', :'product_id'::uuid, 4,
+  :'second_branch_id'::uuid, :'second_warehouse_id'::uuid, auth.uid(), 'CI branch scope seed'
+);
+
+-- Add the second user as an active member using the test superuser, then
+-- assign a custom role limited to stock.read in branch two only.
+RESET ROLE;
+INSERT INTO public.business_members (business_id, user_id, role_key, status)
+VALUES (:'business_id'::uuid, '10000000-0000-4000-8000-000000000002', 'member', 'active');
+
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
+
+INSERT INTO public.roles (business_id, role_key, name, description, is_system, created_by)
+VALUES (:'business_id'::uuid, 'branch-stock-reader', 'مشاهده‌گر انبار شعبه دوم',
+        'Branch-scoped stock read role for CI', false, auth.uid())
+RETURNING id AS branch_reader_role_id \\gset
+
+INSERT INTO public.role_permissions (business_id, role_id, permission_key)
+VALUES (:'business_id'::uuid, :'branch_reader_role_id'::uuid, 'inventory.stock.read');
+
+INSERT INTO public.member_role_assignments
+  (business_id, user_id, role_id, branch_id, status, assigned_by)
+VALUES (
+  :'business_id'::uuid,
+  '10000000-0000-4000-8000-000000000002',
+  :'branch_reader_role_id'::uuid,
+  :'second_branch_id'::uuid,
+  'active',
+  auth.uid()
+);
+
+SELECT set_config('kasbeman.test_second_branch_id', :'second_branch_id', false);
+SELECT set_config('kasbeman.test_second_warehouse_id', :'second_warehouse_id', false);
+
 SELECT set_config('kasbeman.test_business_id', :'business_id', false);
 SELECT set_config('kasbeman.test_warehouse_id', :'warehouse_id', false);
 SELECT set_config('kasbeman.test_product_id', :'product_id', false);
@@ -138,7 +187,48 @@ RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
 
-DO $$
+DO $
+BEGIN
+  IF (SELECT count(*) FROM public.stock_balances
+      WHERE warehouse_id = current_setting('kasbeman.test_second_warehouse_id')::uuid) <> 1 THEN
+    RAISE EXCEPTION 'Branch-scoped stock reader cannot see assigned branch stock';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.stock_balances
+      WHERE warehouse_id = current_setting('kasbeman.test_warehouse_id')::uuid) THEN
+    RAISE EXCEPTION 'Branch-scoped stock reader can see stock from an unassigned branch';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.sales) THEN
+    RAISE EXCEPTION 'Stock-only role can see sales without sales.orders.read';
+  END IF;
+END
+$;
+
+DO $
+BEGIN
+  BEGIN
+    INSERT INTO public.stock_movements (
+      business_id, movement_type, product_id, quantity,
+      to_branch_id, to_warehouse_id, created_by, note
+    ) VALUES (
+      current_setting('kasbeman.test_business_id')::uuid, 'in',
+      current_setting('kasbeman.test_product_id')::uuid, 1,
+      current_setting('kasbeman.test_second_branch_id')::uuid,
+      current_setting('kasbeman.test_second_warehouse_id')::uuid,
+      auth.uid(), 'must be denied: read-only role'
+    );
+    RAISE EXCEPTION 'Read-only branch role unexpectedly inserted a stock movement';
+  EXCEPTION
+    WHEN insufficient_privilege THEN
+      NULL;
+  END;
+END
+$;
+
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
+
+DO $
 BEGIN
   IF EXISTS (SELECT 1 FROM public.businesses WHERE slug = 'kasbeman-ci-tenant') THEN
     RAISE EXCEPTION 'Tenant isolation failed: unrelated user can see another business';
@@ -150,4 +240,4 @@ END
 $$;
 
 RESET ROLE;
-SELECT 'PostgreSQL schema, sales, stock, receipts, reversals, insufficient-stock rollback, and tenant-isolation tests passed.' AS result;
+SELECT 'PostgreSQL schema, sales, stock, receipts, reversals, insufficient-stock rollback, branch-scoped RBAC, read-only enforcement, and tenant-isolation tests passed.' AS result;

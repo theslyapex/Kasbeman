@@ -9,30 +9,26 @@ insert into public.permissions
   (permission_key, module_key, action_key, label_fa, description_fa, is_sensitive)
 values
   ('inventory.warehouses.read', 'inventory', 'warehouses_read', 'مشاهده انبارها', 'مشاهده انبارهای هر شعبه', false),
-  ('inventory.warehouses.manage', 'inventory', 'warehouses_manage', 'مدیریت انبارها', 'ایجاد و ویرایش انبارها', true),
-  ('customers.read', 'customers', 'read', 'مشاهده مشتریان', 'مشاهده پرونده مشتریان کسب‌وکار', false),
-  ('customers.manage', 'customers', 'manage', 'مدیریت مشتریان', 'ایجاد و ویرایش پرونده مشتریان', true)
+  ('inventory.warehouses.manage', 'inventory', 'warehouses_manage', 'مدیریت انبارها', 'ایجاد و ویرایش انبارها', true)
 on conflict (permission_key) do nothing;
 
--- Newly introduced permissions are automatically assigned to protected owner
--- and admin roles, but not to ordinary members.
+-- New warehouse permissions are granted to protected owner/admin roles only.
 insert into public.role_permissions (business_id, role_id, permission_key)
 select r.business_id, r.id, p.permission_key
 from public.roles r
 join public.permissions p
-  on p.permission_key in (
-    'inventory.warehouses.read', 'inventory.warehouses.manage',
-    'customers.read', 'customers.manage'
-  )
+  on p.permission_key in ('inventory.warehouses.read', 'inventory.warehouses.manage')
 where r.is_system and r.role_key in ('owner', 'admin')
 on conflict do nothing;
 
--- Users who can read or manage sales also need customer read access for
--- selecting a customer on an invoice and reviewing the customer's purchase history.
+-- Customer authorization uses the canonical crm.customers.* catalogue
+-- from the RBAC foundation. Sales roles need customer read access to select
+-- customers on invoices and review customer purchase history.
 insert into public.role_permissions (business_id, role_id, permission_key)
-select rp.business_id, rp.role_id, 'customers.read'
+select rp.business_id, rp.role_id, 'crm.customers.read'
 from public.role_permissions rp
-where rp.permission_key in ('sales.orders.read', 'sales.orders.manage', 'customers.manage')
+where rp.permission_key in ('sales.orders.read', 'sales.orders.manage',
+                            'crm.customers.create', 'crm.customers.update')
 on conflict do nothing;
 
 -- Manage permissions imply read access because Postgres UPDATE and the
@@ -900,17 +896,17 @@ alter table public.sale_items enable row level security;
 
 create policy customers_select_authorized on public.customers
   for select to authenticated
-  using ((select private.has_business_permission(business_id, 'customers.read', null)));
+  using ((select private.has_business_permission(business_id, 'crm.customers.read', null)));
 create policy customers_insert_authorized on public.customers
   for insert to authenticated
   with check (
     created_by = (select auth.uid())
-    and (select private.has_business_permission(business_id, 'customers.manage', null))
+    and (select private.has_business_permission(business_id, 'crm.customers.create', null))
   );
 create policy customers_update_authorized on public.customers
   for update to authenticated
-  using ((select private.has_business_permission(business_id, 'customers.manage', null)))
-  with check ((select private.has_business_permission(business_id, 'customers.manage', null)));
+  using ((select private.has_business_permission(business_id, 'crm.customers.update', null)))
+  with check ((select private.has_business_permission(business_id, 'crm.customers.update', null)));
 
 create policy customer_receipt_reversals_select_authorized on public.customer_receipt_reversals
   for select to authenticated using (exists (
