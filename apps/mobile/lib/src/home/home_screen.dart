@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../workspace/branch_selection_store.dart';
 import '../workspace/create_branch_screen.dart';
 import '../workspace/workspace_repository.dart';
 
@@ -11,33 +12,99 @@ class HomeScreen extends StatefulWidget {
     required this.membership,
     required this.repository,
     required this.onSwitchWorkspace,
+    this.branchSelectionStore,
   });
 
   final String email;
   final BusinessMembership membership;
   final WorkspaceRepository repository;
   final VoidCallback onSwitchWorkspace;
+  final BranchSelectionStore? branchSelectionStore;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+class _BranchLoadResult {
+  const _BranchLoadResult({
+    required this.branches,
+    required this.preferredBranchId,
+  });
+
+  final List<BusinessBranch> branches;
+  final String? preferredBranchId;
+}
+
 class _HomeScreenState extends State<HomeScreen> {
-  late Future<List<BusinessBranch>> _branchesFuture;
-  BusinessBranch? _selectedBranch;
+  late Future<_BranchLoadResult> _branchesFuture;
+  late final BranchSelectionStore _selectionStore;
+  String? _selectedBranchId;
 
   bool get _canManageBranches => widget.membership.roleKey == 'owner';
+
+  String get _userId =>
+      Supabase.instance.client.auth.currentUser?.id ?? 'local-user';
 
   @override
   void initState() {
     super.initState();
-    _loadBranches();
+    _selectionStore = widget.branchSelectionStore ??
+        const SharedPreferencesBranchSelectionStore();
+    _branchesFuture = _loadBranches();
   }
 
-  void _loadBranches() {
-    _branchesFuture = widget.repository.fetchBranches(
+  Future<_BranchLoadResult> _loadBranches() async {
+    final branches = await widget.repository.fetchBranches(
       widget.membership.businessId,
     );
+    final savedId = await _selectionStore.read(
+      userId: _userId,
+      businessId: widget.membership.businessId,
+    );
+
+    final savedBranchExists =
+        savedId != null && branches.any((branch) => branch.id == savedId);
+    final fallback = branches.where((branch) => branch.isPrimary);
+    final preferred = savedBranchExists
+        ? savedId
+        : fallback.isNotEmpty
+            ? fallback.first.id
+            : branches.isNotEmpty
+                ? branches.first.id
+                : null;
+
+    return _BranchLoadResult(
+      branches: branches,
+      preferredBranchId: _selectedBranchId ?? preferred,
+    );
+  }
+
+  BusinessBranch? _findBranch(
+    List<BusinessBranch> branches,
+    String? branchId,
+  ) {
+    for (final branch in branches) {
+      if (branch.id == branchId) return branch;
+    }
+    return null;
+  }
+
+  Future<void> _selectBranch(String branchId) async {
+    setState(() => _selectedBranchId = branchId);
+    try {
+      await _selectionStore.write(
+        userId: _userId,
+        businessId: widget.membership.businessId,
+        branchId: branchId,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('شعبه انتخاب شد، اما ذخیره آن روی دستگاه انجام نشد.'),
+        ),
+      );
+    }
   }
 
   Future<void> _createBranch() async {
@@ -53,10 +120,21 @@ class _HomeScreenState extends State<HomeScreen> {
     if (createdId == null || !mounted) return;
 
     setState(() {
-      _selectedBranch = null;
-      _loadBranches();
+      _selectedBranchId = createdId;
+      _branchesFuture = _loadBranches();
     });
 
+    try {
+      await _selectionStore.write(
+        userId: _userId,
+        businessId: widget.membership.businessId,
+        branchId: createdId,
+      );
+    } catch (_) {
+      // The branch remains selected for this session.
+    }
+
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('شعبه با موفقیت ایجاد شد.')),
     );
@@ -141,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 10),
-                          FutureBuilder<List<BusinessBranch>>(
+                          FutureBuilder<_BranchLoadResult>(
                             future: _branchesFuture,
                             builder: (context, snapshot) {
                               if (snapshot.connectionState ==
@@ -158,8 +236,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                       style: TextStyle(color: Colors.white70),
                                     ),
                                     TextButton.icon(
-                                      onPressed: () =>
-                                          setState(_loadBranches),
+                                      onPressed: () => setState(
+                                        () => _branchesFuture = _loadBranches(),
+                                      ),
                                       icon: const Icon(Icons.refresh),
                                       label: const Text('تلاش دوباره'),
                                     ),
@@ -167,7 +246,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 );
                               }
 
-                              final branches = snapshot.data ?? const [];
+                              final result = snapshot.data!;
+                              final branches = result.branches;
                               if (branches.isEmpty) {
                                 return const Text(
                                   'شعبه فعال برای این کسب‌وکار پیدا نشد.',
@@ -175,23 +255,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                 );
                               }
 
-                              final selected = branches.any(
-                                (branch) => branch.id == _selectedBranch?.id,
-                              )
-                                  ? _selectedBranch!
-                                  : branches.first;
-
-                              if (_selectedBranch?.id != selected.id) {
-                                WidgetsBinding.instance.addPostFrameCallback(
-                                  (_) {
-                                    if (mounted) {
-                                      setState(
-                                        () => _selectedBranch = selected,
-                                      );
-                                    }
-                                  },
-                                );
-                              }
+                              final selected = _findBranch(
+                                    branches,
+                                    _selectedBranchId ??
+                                        result.preferredBranchId,
+                                  ) ??
+                                  branches.first;
 
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -218,14 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         )
                                         .toList(),
                                     onChanged: (id) {
-                                      for (final branch in branches) {
-                                        if (branch.id == id) {
-                                          setState(
-                                            () => _selectedBranch = branch,
-                                          );
-                                          break;
-                                        }
-                                      }
+                                      if (id != null) _selectBranch(id);
                                     },
                                   ),
                                   if (selected.code != null &&
@@ -275,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           const Divider(color: Colors.white12),
                           const SizedBox(height: 8),
                           const Text(
-                            'اطلاعات شعبه انتخاب‌شده در ادامه به ماژول‌های عملیاتی مانند فروش، انبار و گزارش‌ها متصل می‌شود.',
+                            'شعبه انتخاب‌شده به‌صورت جداگانه برای هر کسب‌وکار ذخیره می‌شود. عملیات ماژول‌ها باید شناسه همین شعبه را در درخواست‌های خود ارسال کنند.',
                             style: TextStyle(
                               color: Colors.white70,
                               height: 1.8,
