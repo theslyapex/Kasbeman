@@ -339,6 +339,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 builder: (_) => InventoryScreen(
                                                   membership: widget.membership,
                                                   branch: selected,
+                                                  permissions: result.permissions,
                                                 ),
                                               ),
                                             )

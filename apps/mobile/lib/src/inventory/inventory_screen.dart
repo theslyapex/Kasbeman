@@ -8,17 +8,20 @@ import 'inventory_history_screen.dart';
 import 'sales_screen.dart';
 import 'sales_history_screen.dart';
 import 'customers_screen.dart';
+import 'inventory_permissions.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({
     super.key,
     required this.membership,
     required this.branch,
+    required this.permissions,
     this.repository,
   });
 
   final BusinessMembership membership;
   final BusinessBranch branch;
+  final Set<String> permissions;
   final InventoryRepository? repository;
 
   @override
@@ -29,6 +32,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
   late final InventoryRepository _repository;
+  late final InventoryPermissions _permissions;
   late Future<List<InventoryProduct>> _productsFuture;
   late Future<List<InventoryBalance>> _balancesFuture;
 
@@ -38,6 +42,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     _tabs = TabController(length: 2, vsync: this);
     _repository = widget.repository ??
         SupabaseInventoryRepository(Supabase.instance.client);
+    _permissions = InventoryPermissions(widget.permissions);
     _reload();
   }
 
@@ -57,6 +62,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           membership: widget.membership,
           branch: widget.branch,
           repository: _repository,
+          permissions: widget.permissions,
         ),
       ),
     );
@@ -159,31 +165,36 @@ class _InventoryScreenState extends State<InventoryScreen>
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: 'مدیریت مشتریان',
-            onPressed: _openCustomers,
-            icon: const Icon(Icons.people_alt_outlined),
-          ),
-          IconButton(
-            tooltip: 'فهرست فروش‌ها',
-            onPressed: _openSalesHistory,
-            icon: const Icon(Icons.receipt_long_outlined),
-          ),
-          IconButton(
-            tooltip: 'ثبت فروش',
-            onPressed: _openSales,
-            icon: const Icon(Icons.point_of_sale_outlined),
-          ),
-          IconButton(
-            tooltip: 'تاریخچه گردش',
-            onPressed: _openHistory,
-            icon: const Icon(Icons.history),
-          ),
-          IconButton(
-            tooltip: 'ثبت گردش موجودی',
-            onPressed: _openMovements,
-            icon: const Icon(Icons.swap_horiz),
-          ),
+          if (_permissions.canReadCustomers)
+            IconButton(
+              tooltip: 'مدیریت مشتریان',
+              onPressed: _openCustomers,
+              icon: const Icon(Icons.people_alt_outlined),
+            ),
+          if (_permissions.canReadSales)
+            IconButton(
+              tooltip: 'فهرست فروش‌ها',
+              onPressed: _openSalesHistory,
+              icon: const Icon(Icons.receipt_long_outlined),
+            ),
+          if (_permissions.canManageSales)
+            IconButton(
+              tooltip: 'ثبت فروش',
+              onPressed: _openSales,
+              icon: const Icon(Icons.point_of_sale_outlined),
+            ),
+          if (_permissions.canReadStock)
+            IconButton(
+              tooltip: 'تاریخچه گردش',
+              onPressed: _openHistory,
+              icon: const Icon(Icons.history),
+            ),
+          if (_permissions.canManageStock)
+            IconButton(
+              tooltip: 'ثبت گردش موجودی',
+              onPressed: _openMovements,
+              icon: const Icon(Icons.swap_horiz),
+            ),
           IconButton(
             tooltip: 'بروزرسانی',
             onPressed: () => setState(_reload),
@@ -193,7 +204,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       ),
       floatingActionButton: AnimatedBuilder(
         animation: _tabs,
-        builder: (context, _) => _tabs.index == 0
+        builder: (context, _) => _tabs.index == 0 && _permissions.canManageItems
             ? FloatingActionButton.extended(
                 onPressed: _addProduct,
                 icon: const Icon(Icons.add),

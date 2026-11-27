@@ -16,6 +16,13 @@ class CustomersScreen extends StatefulWidget {
 
   final String businessId;
   final InventoryRepository repository;
+  final Set<String> permissions;
+
+  bool get _canEdit => permissions.contains('crm.customers.update');
+  bool get _canArchive => permissions.contains('crm.customers.delete');
+  bool get _canCreate => permissions.contains('crm.customers.create');
+  bool get _canReceive => permissions.contains('finance.payments.manage');
+  bool get _canExport => permissions.contains('reports.export');
 
   @override
   State<CustomersScreen> createState() => _CustomersScreenState();
@@ -401,8 +408,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
       appBar: AppBar(
         title: const Text('مدیریت مشتریان'),
         actions: [
-          IconButton(
-            onPressed: () => setState(() {
+          if (_canArchive)
+            IconButton(
+              onPressed: () => setState(() {
               _showArchived = !_showArchived;
               _load();
             }),
@@ -412,11 +420,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
           IconButton(onPressed: _refresh, tooltip: 'بروزرسانی', icon: const Icon(Icons.refresh)),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addCustomer,
-        icon: const Icon(Icons.person_add_alt_1),
-        label: const Text('مشتری جدید'),
-      ),
+      floatingActionButton: _canCreate
+          ? FloatingActionButton.extended(
+              onPressed: _addCustomer,
+              icon: const Icon(Icons.person_add_alt_1),
+              label: const Text('مشتری جدید'),
+            )
+          : null,
       body: Column(
         children: [
           Padding(
@@ -627,7 +637,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                   spacing: 8,
                                   runSpacing: 8,
                                   children: [
-                                    OutlinedButton.icon(
+                                    if (_canExport)
+                                      OutlinedButton.icon(
                                       onPressed: _exportingCustomerId == customer.id
                                           ? null
                                           : () => _exportStatement(customer),
@@ -640,18 +651,20 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                           : const Icon(Icons.description_outlined, size: 18),
                                       label: const Text('صورت‌حساب'),
                                     ),
-                                    OutlinedButton.icon(
+                                    if (_canEdit)
+                                      OutlinedButton.icon(
                                       onPressed: () => _editCustomer(customer),
                                       icon: const Icon(Icons.edit_outlined, size: 18),
                                       label: const Text('ویرایش پرونده'),
                                     ),
-                                    if (customer.status == 'active')
+                                    if (_canReceive && customer.status == 'active')
                                       FilledButton.tonalIcon(
                                         onPressed: () => _recordReceipt(customer),
                                         icon: const Icon(Icons.payments_outlined, size: 18),
                                         label: const Text('ثبت دریافت'),
                                       ),
-                                    TextButton.icon(
+                                    if (_canArchive)
+                                      TextButton.icon(
                                       onPressed: () => _changeCustomerStatus(customer),
                                       icon: Icon(
                                         customer.status == 'active'
@@ -732,7 +745,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                             style: TextStyle(fontWeight: FontWeight.w800, color: entry.isReceipt
                                               ? const Color(0xFF5AD6A0) : const Color(0xFF00D8E8)),
                                           ),
-                                          if (entry.isReceipt && !entry.isReversed && entry.receiptId != null)
+                                          if (_canReceive && entry.isReceipt && !entry.isReversed && entry.receiptId != null)
                                             IconButton(
                                               tooltip: 'برگشت دریافت',
                                               visualDensity: VisualDensity.compact,
