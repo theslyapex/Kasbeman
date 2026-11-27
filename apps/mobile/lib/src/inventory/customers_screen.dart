@@ -45,6 +45,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Future<void> _refresh() async {
+    _purchaseHistory.clear();
     setState(_load);
     await _future;
   }
@@ -149,6 +150,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 9),
                     itemBuilder: (context, index) {
                       final customer = customers[index];
+                      final contact = [
+                        if (customer.phone?.isNotEmpty == true) customer.phone!,
+                        if (customer.companyName?.isNotEmpty == true) customer.companyName!,
+                      ].join(' • ');
                       return Card(
                         child: ExpansionTile(
                           leading: const CircleAvatar(
@@ -156,23 +161,17 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             child: Icon(Icons.person_outline, color: Color(0xFF00D8E8)),
                           ),
                           title: Text(customer.name),
-                          subtitle: Text([
-                            if (customer.phone?.isNotEmpty == true) customer.phone!,
-                            if (customer.companyName?.isNotEmpty == true) customer.companyName!,
-                          ].join(' • ').isEmpty ? 'بدون اطلاعات تماس' : [
-                            if (customer.phone?.isNotEmpty == true) customer.phone!,
-                            if (customer.companyName?.isNotEmpty == true) customer.companyName!,
-                          ].join(' • ')),
+                          subtitle: Text(contact.isEmpty ? 'بدون اطلاعات تماس' : contact),
                           onExpansionChanged: (expanded) {
-                          setState(() {
-                            if (expanded) {
-                              _expandedCustomers.add(customer.id);
-                            } else {
-                              _expandedCustomers.remove(customer.id);
-                            }
-                          });
-                        },
-                        children: [
+                            setState(() {
+                              if (expanded) {
+                                _expandedCustomers.add(customer.id);
+                              } else {
+                                _expandedCustomers.remove(customer.id);
+                              }
+                            });
+                          },
+                          children: [
                             const Divider(height: 1),
                             _CustomerDetail(label: 'ایمیل', value: customer.email),
                             _CustomerDetail(label: 'نشانی', value: customer.address),
@@ -191,8 +190,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
                               const SizedBox.shrink()
                             else
                               FutureBuilder<List<SaleRecord>>(
-                              future: _historyFor(customer.id),
-                              builder: (context, history) {
+                                future: _historyFor(customer.id),
+                                builder: (context, history) {
                                 if (history.connectionState == ConnectionState.waiting) {
                                   return const Padding(
                                     padding: EdgeInsets.all(14),
