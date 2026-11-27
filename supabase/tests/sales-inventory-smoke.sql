@@ -128,7 +128,7 @@ SELECT public.record_customer_receipt(
 ) AS duplicate_receipt_id \gset
 SELECT set_config('kasbeman.test_duplicate_receipt_id', :'duplicate_receipt_id', false);
 
-DO $
+DO $$
 BEGIN
   IF current_setting('kasbeman.test_receipt_id') <>
      current_setting('kasbeman.test_duplicate_receipt_id') THEN
@@ -143,9 +143,9 @@ BEGIN
     RAISE EXCEPTION 'Idempotent retry changed the received total';
   END IF;
 END
-$;
+$$;
 
-DO $
+DO $$
 BEGIN
   BEGIN
     PERFORM public.record_customer_receipt(
@@ -162,7 +162,7 @@ BEGIN
     RAISE EXCEPTION 'Mismatched idempotency retry changed receipt count';
   END IF;
 END
-$;
+$$;
 
 SELECT set_config('kasbeman.test_sale_id', :'sale_id', false);
 

@@ -649,7 +649,7 @@ returns uuid
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_user_id uuid := (select auth.uid());
   v_sale public.sales%rowtype;
@@ -736,7 +736,7 @@ begin
 
   return v_receipt_id;
 end;
-$;
+$$;
 
 revoke all on function public.record_customer_receipt(uuid, numeric, text, uuid, text, text)
   from public, anon, authenticated;
