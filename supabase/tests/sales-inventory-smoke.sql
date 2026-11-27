@@ -224,8 +224,8 @@ SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
 
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.businesses WHERE slug = 'kasbeman-ci-tenant') THEN
-    RAISE EXCEPTION 'Tenant membership visibility check unexpectedly failed';
+  IF NOT EXISTS (SELECT 1 FROM public.businesses WHERE slug = 'kasbeman-ci-tenant') THEN
+    RAISE EXCEPTION 'Active tenant member cannot see the business';
   END IF;
   IF EXISTS (SELECT 1 FROM public.customers WHERE name = 'مشتری آزمایشی') THEN
     RAISE EXCEPTION 'Branch-only member can see customers without CRM permission';
