@@ -226,8 +226,70 @@ class SaleItemRecord {
   }
 }
 
+class CustomerRecord {
+  const CustomerRecord({
+    required this.id,
+    required this.businessId,
+    required this.name,
+    required this.phone,
+    required this.email,
+    required this.companyName,
+    required this.address,
+    required this.notes,
+    required this.status,
+    required this.purchaseCount,
+    required this.totalPurchases,
+  });
+
+  final String id;
+  final String businessId;
+  final String name;
+  final String? phone;
+  final String? email;
+  final String? companyName;
+  final String? address;
+  final String? notes;
+  final String status;
+  final int purchaseCount;
+  final num totalPurchases;
+
+  factory CustomerRecord.fromJson(Map<String, dynamic> json) {
+    final sales = (json['sales'] as List? ?? const [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .where((sale) => sale['status'] == 'confirmed')
+        .toList(growable: false);
+    return CustomerRecord(
+      id: json['id'] as String,
+      businessId: json['business_id'] as String,
+      name: json['name'] as String,
+      phone: json['phone'] as String?,
+      email: json['email'] as String?,
+      companyName: json['company_name'] as String?,
+      address: json['address'] as String?,
+      notes: json['notes'] as String?,
+      status: json['status'] as String,
+      purchaseCount: sales.length,
+      totalPurchases: sales.fold<num>(
+        0, (sum, sale) => sum + (sale['grand_total'] as num),
+      ),
+    );
+  }
+}
+
 abstract interface class InventoryRepository {
   Future<List<InventoryProduct>> fetchProducts(String businessId);
+
+  Future<List<CustomerRecord>> fetchCustomers(String businessId);
+
+  Future<String> createCustomer({
+    required String businessId,
+    required String name,
+    String? phone,
+    String? email,
+    String? companyName,
+    String? address,
+    String? notes,
+  });
 
   Future<String> createProduct({
     required String businessId,
@@ -250,13 +312,20 @@ abstract interface class InventoryRepository {
     required String branchId,
   });
 
-  Future<List<SaleRecord>> fetchSales({\n    required String businessId,\n    required String branchId,\n    String? status,\n  });\n\n  Future<String> createSaleDraft({
+  Future<List<SaleRecord>> fetchSales({
+    required String businessId,
+    required String branchId,
+    String? status,
+  });
+
+  Future<String> createSaleDraft({
     required String businessId,
     required String branchId,
     required String warehouseId,
     required String saleNumber,
     required List<Map<String, dynamic>> items,
     String? customerName,
+    String? customerId,
     String? notes,
   });
 
@@ -285,6 +354,54 @@ class SupabaseInventoryRepository implements InventoryRepository {
   SupabaseInventoryRepository(this._client);
 
   final SupabaseClient _client;
+
+  @override
+  Future<List<CustomerRecord>> fetchCustomers(String businessId) async {
+    final rows = await _client
+        .from('customers')
+        .select(
+          'id,business_id,name,phone,email,company_name,address,notes,status,'
+          'sales!sales_customer_fkey(id,grand_total,status)',
+        )
+        .eq('business_id', businessId)
+        .eq('status', 'active')
+        .order('name')
+        .limit(500);
+    return rows.map((row) => CustomerRecord.fromJson(
+      Map<String, dynamic>.from(row),
+    )).toList(growable: false);
+  }
+
+  @override
+  Future<String> createCustomer({
+    required String businessId,
+    required String name,
+    String? phone,
+    String? email,
+    String? companyName,
+    String? address,
+    String? notes,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      throw const FormatException('Authentication required.');
+    }
+    final row = await _client.from('customers').insert({
+      'business_id': businessId,
+      'created_by': userId,
+      'name': name.trim(),
+      'phone': _emptyToNull(phone),
+      'email': _emptyToNull(email),
+      'company_name': _emptyToNull(companyName),
+      'address': _emptyToNull(address),
+      'notes': _emptyToNull(notes),
+    }).select('id').single();
+    final id = row['id'];
+    if (id is! String || id.isEmpty) {
+      throw const FormatException('Unexpected customer identifier.');
+    }
+    return id;
+  }
 
   @override
   Future<List<InventoryProduct>> fetchProducts(String businessId) async {
@@ -419,6 +536,7 @@ class SupabaseInventoryRepository implements InventoryRepository {
     required String saleNumber,
     required List<Map<String, dynamic>> items,
     String? customerName,
+    String? customerId,
     String? notes,
   }) async {
     final result = await _client.rpc('create_sale_draft', params: {
@@ -427,6 +545,7 @@ class SupabaseInventoryRepository implements InventoryRepository {
       'p_warehouse_id': warehouseId,
       'p_sale_number': saleNumber,
       'p_customer_name': _emptyToNull(customerName),
+      'p_customer_id': customerId,
       'p_notes': _emptyToNull(notes),
       'p_items': items,
     });
