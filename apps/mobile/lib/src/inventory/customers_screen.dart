@@ -1107,7 +1107,7 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
       }
     }
 
-    final savedRequest = request!;
+    final savedRequest = request;
     setState(() => _saving = true);
     try {
       await widget.repository.recordCustomerReceipt(
@@ -1160,8 +1160,8 @@ class _CustomerReceiptFormState extends State<_CustomerReceiptForm> {
     }
   }
 
-  bool _isDefinitiveReceiptRejection(String code) =>
-      const {'22023', '23514', '42501', '28000', 'P0002', '23505'}.contains(code);
+  bool _isDefinitiveReceiptRejection(String? code) =>
+      code != null && const {'22023', '23514', '42501', '28000', 'P0002', '23505'}.contains(code);
 
   @override
   Widget build(BuildContext context) {
