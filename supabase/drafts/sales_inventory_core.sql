@@ -323,6 +323,33 @@ create index customer_receipts_business_customer_date_idx
 create index customer_receipts_business_sale_idx
   on public.customer_receipts (business_id, sale_id, received_at desc);
 
+alter table public.customer_receipts
+  add constraint customer_receipts_business_id_id_unique unique (business_id, id);
+
+-- Immutable full reversal record; one reversal maximum for each receipt.
+create table public.customer_receipt_reversals (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null,
+  receipt_id uuid not null,
+  sale_id uuid not null,
+  customer_id uuid not null,
+  amount numeric(18,2) not null,
+  reason text not null,
+  reversed_at timestamptz not null default now(),
+  created_by uuid not null references auth.users(id) on delete restrict,
+  constraint customer_receipt_reversals_amount_positive check (amount > 0),
+  constraint customer_receipt_reversals_reason_length check (char_length(btrim(reason)) between 3 and 500),
+  constraint customer_receipt_reversals_one_per_receipt unique (business_id, receipt_id),
+  constraint customer_receipt_reversals_receipt_fkey foreign key (business_id, receipt_id)
+    references public.customer_receipts (business_id, id) on delete restrict,
+  constraint customer_receipt_reversals_sale_customer_fkey foreign key (business_id, sale_id, customer_id)
+    references public.sales (business_id, id, customer_id) on delete restrict
+);
+create index customer_receipt_reversals_customer_date_idx
+  on public.customer_receipt_reversals (business_id, customer_id, reversed_at desc);
+revoke all on public.customer_receipt_reversals from public, anon, authenticated;
+grant select on public.customer_receipt_reversals to authenticated;
+
 create or replace view public.customer_invoice_balance_summary
 with (security_invoker = true)
 as
@@ -331,13 +358,17 @@ select
   s.customer_id,
   s.id as sale_id,
   s.grand_total,
-  coalesce(sum(r.amount), 0)::numeric(18,2) as total_received,
-  greatest(s.grand_total - coalesce(sum(r.amount), 0), 0)::numeric(18,2) as balance_due
+  coalesce(receipts.total_received, 0)::numeric(18,2) as total_received,
+  greatest(s.grand_total - coalesce(receipts.total_received, 0), 0)::numeric(18,2) as balance_due
 from public.sales s
-left join public.customer_receipts r
-  on r.business_id = s.business_id and r.sale_id = s.id
-where s.status = 'confirmed' and s.customer_id is not null
-group by s.business_id, s.customer_id, s.id, s.grand_total;
+left join lateral (
+  select coalesce(sum(r.amount), 0) - coalesce(sum(rv.amount), 0) as total_received
+  from public.customer_receipts r
+  left join public.customer_receipt_reversals rv
+    on rv.business_id = r.business_id and rv.receipt_id = r.id
+  where r.business_id = s.business_id and r.sale_id = s.id
+) receipts on true
+where s.status = 'confirmed' and s.customer_id is not null;
 
 create or replace view public.customer_purchase_summary
 with (security_invoker = true)
@@ -647,8 +678,11 @@ begin
     raise exception 'Insufficient permission to record a receipt' using errcode = '42501';
   end if;
 
-  select coalesce(sum(r.amount), 0)::numeric(18,2) into v_received
+  select (coalesce(sum(r.amount), 0) - coalesce(sum(rv.amount), 0))::numeric(18,2)
+    into v_received
   from public.customer_receipts r
+  left join public.customer_receipt_reversals rv
+    on rv.business_id = r.business_id and rv.receipt_id = r.id
   where r.business_id = v_sale.business_id and r.sale_id = v_sale.id;
 
   if v_received + v_amount > v_sale.grand_total then
@@ -673,6 +707,44 @@ revoke all on function public.record_customer_receipt(uuid, numeric, text, text,
   from public, anon, authenticated;
 grant execute on function public.record_customer_receipt(uuid, numeric, text, text, text)
   to authenticated;
+
+-- Record a full reversal as a new immutable accounting event.
+create or replace function public.reverse_customer_receipt(p_receipt_id uuid, p_reason text)
+returns uuid language plpgsql security definer set search_path = '' as $
+declare
+  v_user_id uuid := (select auth.uid());
+  v_receipt public.customer_receipts%rowtype;
+  v_sale public.sales%rowtype;
+  v_reason text := nullif(btrim(p_reason), '');
+  v_reversal_id uuid;
+begin
+  if v_user_id is null then raise exception 'Authentication required' using errcode = '28000'; end if;
+  if v_reason is null or char_length(v_reason) < 3 or char_length(v_reason) > 500 then
+    raise exception 'A reversal reason between 3 and 500 characters is required' using errcode = '22023';
+  end if;
+  select r.* into v_receipt from public.customer_receipts r where r.id = p_receipt_id for update;
+  if not found then raise exception 'Receipt not found' using errcode = 'P0002'; end if;
+  select s.* into v_sale from public.sales s
+    where s.business_id = v_receipt.business_id and s.id = v_receipt.sale_id for update;
+  if not found or v_sale.status <> 'confirmed' then
+    raise exception 'Confirmed invoice not found' using errcode = 'P0002';
+  end if;
+  if not (select private.has_business_permission(v_sale.business_id, 'sales.orders.manage', v_sale.branch_id)) then
+    raise exception 'Insufficient permission to reverse a receipt' using errcode = '42501';
+  end if;
+  if exists (select 1 from public.customer_receipt_reversals rv
+    where rv.business_id = v_receipt.business_id and rv.receipt_id = v_receipt.id) then
+    raise exception 'Receipt has already been reversed' using errcode = '23505';
+  end if;
+  insert into public.customer_receipt_reversals
+    (business_id, receipt_id, sale_id, customer_id, amount, reason, created_by)
+  values (v_receipt.business_id, v_receipt.id, v_receipt.sale_id, v_receipt.customer_id,
+    v_receipt.amount, v_reason, v_user_id) returning id into v_reversal_id;
+  return v_reversal_id;
+end;
+$;
+revoke all on function public.reverse_customer_receipt(uuid, text) from public, anon, authenticated;
+grant execute on function public.reverse_customer_receipt(uuid, text) to authenticated;
 
 create or replace function public.confirm_sale(p_sale_id uuid)
 returns uuid
@@ -834,6 +906,13 @@ create policy customers_update_authorized on public.customers
   using ((select private.has_business_permission(business_id, 'customers.manage', null)))
   with check ((select private.has_business_permission(business_id, 'customers.manage', null)));
 
+create policy customer_receipt_reversals_select_authorized on public.customer_receipt_reversals
+  for select to authenticated using (exists (
+    select 1 from public.sales s
+    where s.business_id = customer_receipt_reversals.business_id
+      and s.id = customer_receipt_reversals.sale_id
+      and (select private.has_business_permission(s.business_id, 'sales.orders.read', s.branch_id))
+  ));
 create policy customer_receipts_select_authorized on public.customer_receipts
   for select to authenticated
   using (exists (
