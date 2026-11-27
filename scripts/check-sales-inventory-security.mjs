@@ -34,16 +34,21 @@ for (const rpc of ["record_customer_receipt", "reverse_customer_receipt", "confi
 }
 
 const draftSaleStart = sql.toLowerCase().indexOf("function public.create_sale_draft(");
-const draftSaleEnd = sql.indexOf("$;", draftSaleStart);
+const draftSaleEnd = sql.indexOf("$$;", draftSaleStart);
 const draftSaleFunction = sql.slice(draftSaleStart, draftSaleEnd + 3);
-if (draftSaleStart < 0 || !/set search_path\\s*=\\s*''/i.test(draftSaleFunction)) {
+if (draftSaleStart < 0 || !draftSaleFunction.includes("set search_path = ''")) {
   failures.push("create_sale_draft: missing function definition or empty search_path");
 }
 if (/security definer/i.test(draftSaleFunction)) {
   failures.push("create_sale_draft: must remain invoker-security and rely on table RLS");
 }
-if (!/create policy sales_insert_authorized[\\s\\S]*?sales\\.orders\\.manage/i.test(sql)
-  || !/create policy sale_items_insert_draft_authorized[\\s\\S]*?sales\\.orders\\.manage/i.test(sql)) {
+const salesInsertPolicyStart = sql.indexOf("create policy sales_insert_authorized");
+const salesInsertPolicyEnd = sql.indexOf("create policy sale_items_select_authorized", salesInsertPolicyStart);
+const salesInsertPolicy = sql.slice(salesInsertPolicyStart, salesInsertPolicyEnd);
+const saleItemsInsertPolicyStart = sql.indexOf("create policy sale_items_insert_draft_authorized");
+const saleItemsInsertPolicyEnd = sql.indexOf("create policy sale_items_update_draft_authorized", saleItemsInsertPolicyStart);
+const saleItemsInsertPolicy = sql.slice(saleItemsInsertPolicyStart, saleItemsInsertPolicyEnd);
+if (!salesInsertPolicy.includes("sales.orders.manage") || !saleItemsInsertPolicy.includes("sales.orders.manage")) {
   failures.push("create_sale_draft: required RLS insert policies are missing");
 }
 
