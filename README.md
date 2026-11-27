@@ -4,6 +4,18 @@
 
 پلتفرم یکپارچه و ماژولار مدیریت کسب‌وکار.
 
+## Product architecture
+
+Kasbeman is developed as two separate client applications backed by one shared backend:
+
+- **Web:** Next.js App Router in `apps/web`. The web product is an independent, responsive website and business workspace; it is not a Flutter Web application.
+- **Mobile:** Flutter in `apps/mobile`, targeting Android and iOS. The mobile app consumes the same backend and business APIs as the web application.
+- **Backend:** Supabase (PostgreSQL, Auth, Storage, and server-side functions where appropriate).
+- **Source control:** Both applications and backend assets live in this GitHub monorepo.
+- **Web hosting:** Cloudflare is the planned web runtime/edge platform. GitHub is the source repository and CI/CD source, not the application runtime.
+
+The mobile app must not duplicate business rules. Authorization, tenant isolation, and critical business operations remain enforced by the shared backend.
+
 ## Project status
 
 The web workspace includes the initial Supabase Auth flow (email/password signup, login, email confirmation callback), a protected workspace dashboard, and atomic business creation.
@@ -18,15 +30,18 @@ The identity/tenancy foundation migration is applied to the hosted Supabase proj
 - Shared business capabilities with independently activated industry modules.
 - API-first integration boundaries.
 - Persian-first RTL experience with internationalization readiness.
+- Offline-capable mobile workflows using a local database, an outbox, idempotent synchronization, and explicit conflict handling.
 
 ## Workspace
 
 - `apps/web`: Next.js web application.
+- `apps/mobile`: Flutter Android/iOS application (bootstrap pending).
 - `apps/platform-admin`: separate platform control plane (reserved).
-- `apps/mobile`: Flutter application (reserved).
-- `packages/*`: shared TypeScript packages.
+- `packages/*`: shared TypeScript packages and API contracts for web-side tooling.
 - `supabase/*`: database migrations, seed data, functions, and tests.
 - `docs/*`: architecture, security, and deployment documentation.
+
+Flutter and TypeScript do not share runtime code. They share backend contracts, API semantics, validation rules where practical, and documented domain behavior.
 
 ## Getting started
 
@@ -35,8 +50,10 @@ The identity/tenancy foundation migration is applied to the hosted Supabase proj
 3. Copy `/.env.example` to `apps/web/.env.local` and provide the Supabase project URL and publishable key.
 4. Run `pnpm --filter @kasbeman/web dev`.
 
+The Flutter workspace will have its own Flutter/Dart toolchain and dependency lockfile when bootstrapped. Do not hand-edit either lockfile.
+
 Do not put Supabase secret keys in browser-visible environment variables.
 
 ## Current limitations
 
-This is an initial scaffold, not a deployed product. Only the identity/tenancy foundation migration has been applied to the hosted Supabase project; RBAC remains pending explicit production approval. The web app still requires environment configuration and Supabase Auth redirect URL setup before live signup can be tested. Cloudflare account access is available, but no Kasbeman Worker or domain zone is configured yet.
+This is an initial scaffold, not a deployed product. Only the identity/tenancy foundation migration has been applied to the hosted Supabase project; RBAC remains pending explicit production approval. The web app still requires environment configuration and Supabase Auth redirect URL setup before live signup can be tested. Cloudflare account access is available, but no Kasbeman Worker or domain zone is configured yet. The Flutter app directory is currently reserved for the mobile application and has not yet been bootstrapped.
