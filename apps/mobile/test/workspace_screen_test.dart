@@ -72,6 +72,13 @@ class _FakeWorkspaceRepository implements WorkspaceRepository {
       ];
 
   @override
+  Future<Set<String>> fetchPermissions({
+    required String businessId,
+    required String userId,
+    required String? branchId,
+  }) async => {'branches.manage', 'inventory.items.read', 'inventory.stock.read'};
+
+  @override
   Future<String> createBranch({
     required String businessId,
     required String name,
