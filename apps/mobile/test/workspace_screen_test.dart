@@ -67,7 +67,7 @@ void main() {
     await tester.tap(find.text('ساخت اولین کسب‌وکار'));
     await tester.pumpAndSettle();
 
-    expect(find.text('ساخت کسب‌وکار'), findsOneWidget);
+    expect(find.text('ساخت کسب‌وکار'), findsNWidgets(2));
 
     await tester.enterText(
       find.widgetWithText(TextFormField, 'نام کسب‌وکار'),
