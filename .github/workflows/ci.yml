@@ -42,6 +42,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: vinext compatibility scan (non-migrating)
+        working-directory: apps/web
+        run: pnpm dlx vinext check
+
       - name: TypeScript validation
         run: pnpm typecheck
 
