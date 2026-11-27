@@ -75,6 +75,15 @@ jobs:
           PGDATABASE: kasbeman_test
         run: bash scripts/test-postgres-schema.sh
 
+      - name: Run PostgreSQL 17 multi-connection concurrency tests
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: kasbeman_test
+        run: bash scripts/test-postgres-concurrency.sh
+
       - name: vinext compatibility scan (non-migrating)
         working-directory: apps/web
         run: pnpm dlx vinext check
