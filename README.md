@@ -6,7 +6,9 @@
 
 ## Project status
 
-The web workspace includes the initial Supabase Auth flow (email/password signup, login, email confirmation callback), a protected workspace dashboard, and atomic business creation. Identity/tenancy and RBAC foundation migrations have been applied to the hosted Supabase project; module-specific authorization and production deployment remain in progress.
+The web workspace includes the initial Supabase Auth flow (email/password signup, login, email confirmation callback), a protected workspace dashboard, and atomic business creation.
+
+The identity/tenancy foundation migration is applied to the hosted Supabase project. The RBAC foundation migration is prepared and transaction-tested, but has **not** been applied to production. Module-specific authorization and production deployment remain in progress.
 
 ## Architecture principles
 
@@ -24,7 +26,7 @@ The web workspace includes the initial Supabase Auth flow (email/password signup
 - `apps/mobile`: Flutter application (reserved).
 - `packages/*`: shared TypeScript packages.
 - `supabase/*`: database migrations, seed data, functions, and tests.
-- `docs/*`: architecture and security documentation.
+- `docs/*`: architecture, security, and deployment documentation.
 
 ## Getting started
 
@@ -37,4 +39,4 @@ Do not put Supabase secret keys in browser-visible environment variables.
 
 ## Current limitations
 
-This is an initial scaffold, not a deployed product. The hosted project has the identity/tenancy and RBAC foundation migrations applied. The web app still requires environment configuration and Supabase Auth redirect URL setup before live signup can be tested.
+This is an initial scaffold, not a deployed product. Only the identity/tenancy foundation migration has been applied to the hosted Supabase project; RBAC remains pending explicit production approval. The web app still requires environment configuration and Supabase Auth redirect URL setup before live signup can be tested. Cloudflare account access is available, but no Kasbeman Worker or domain zone is configured yet.
