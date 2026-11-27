@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../home/home_screen.dart';
+import 'create_business_screen.dart';
 import 'workspace_repository.dart';
 
 class WorkspaceScreen extends StatefulWidget {
@@ -33,6 +34,21 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
   void _loadMemberships() {
     _membershipsFuture = _repository.fetchMyBusinesses();
+  }
+
+  Future<void> _createBusiness() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => CreateBusinessScreen(repository: _repository),
+      ),
+    );
+
+    if (created == true && mounted) {
+      setState(_loadMemberships);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('کسب‌وکار با موفقیت ساخته شد.')),
+      );
+    }
   }
 
   Future<void> _signOut() async {
@@ -72,6 +88,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         title: const Text('انتخاب فضای کاری'),
         actions: [
           IconButton(
+            tooltip: 'ساخت کسب‌وکار',
+            onPressed: _createBusiness,
+            icon: const Icon(Icons.add_business_outlined),
+          ),
+          IconButton(
             tooltip: 'خروج از حساب',
             onPressed: _signOut,
             icon: const Icon(Icons.logout),
@@ -98,19 +119,19 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                       description:
                           'اتصال را بررسی کن و دوباره تلاش کن. اطلاعات حساب و دسترسی‌ها تغییری نکرده‌اند.',
                       actionLabel: 'تلاش دوباره',
-                      onAction: () {
-                        setState(_loadMemberships);
-                      },
+                      onAction: () => setState(_loadMemberships),
                     );
                   }
 
                   final memberships = snapshot.data ?? const [];
                   if (memberships.isEmpty) {
-                    return const _MessageState(
+                    return _MessageState(
                       icon: Icons.storefront_outlined,
                       title: 'هنوز فضای کاری فعالی نداری',
                       description:
-                          'وقتی به یک کسب‌وکار اضافه شوی یا کسب‌وکاری برای حسابت ایجاد شود، از این بخش می‌توانی وارد آن شوی.',
+                          'می‌توانی همین حالا اولین کسب‌وکارت را بسازی یا بعداً با دعوت‌نامه به کسب‌وکار دیگری بپیوندی.',
+                      actionLabel: 'ساخت اولین کسب‌وکار',
+                      onAction: _createBusiness,
                     );
                   }
 
@@ -144,6 +165,12 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                             );
                           },
                         ),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _createBusiness,
+                        icon: const Icon(Icons.add_business_outlined),
+                        label: const Text('افزودن کسب‌وکار دیگر'),
                       ),
                     ],
                   );
@@ -260,7 +287,7 @@ class _MessageState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
