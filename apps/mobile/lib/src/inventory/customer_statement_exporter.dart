@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:cross_file/cross_file.dart';
 import 'package:excel/excel.dart';
+import 'package:pdf/pdf.dart' as pdf;
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
@@ -69,8 +70,8 @@ class CustomerStatementReport {
         _StatementEvent(
           date: receipt.receivedAt,
           title: 'دریافت فاکتور ${receipt.saleNumber}',
-          description: _paymentLabel(receipt.paymentMethod)
-              ${receipt.reference == null ? '' : ' • ${receipt.reference}'},
+          description: '${_paymentLabel(receipt.paymentMethod)}'
+              '${receipt.reference == null ? '' : ' • ${receipt.reference}'},
           amount: receipt.amount,
           isReceipt: true,
         ),
@@ -191,7 +192,7 @@ class CustomerStatementExporter {
         ]),
     ];
     document.addPage(pw.MultiPage(
-      pageFormat: pw.PdfPageFormat.a4.landscape,
+      pageFormat: pdf.PdfPageFormat.a4.landscape,
       margin: const pw.EdgeInsets.all(28),
       theme: pw.ThemeData.withFont(base: font, bold: font),
       build: (context) => [
@@ -210,7 +211,7 @@ class CustomerStatementExporter {
               pw.Text('مانده اول دوره: ${_signed(report.openingBalance)} تومان'),
               pw.SizedBox(height: 14),
               pw.Table(
-                border: pw.TableBorder.all(color: const PdfColor(0.78, 0.82, 0.87), width: 0.5),
+                border: pw.TableBorder.all(color: const pdf.PdfColor(0.78, 0.82, 0.87), width: 0.5),
                 columnWidths: const {
                   0: pw.FixedColumnWidth(72),
                   1: pw.FlexColumnWidth(1.3),
