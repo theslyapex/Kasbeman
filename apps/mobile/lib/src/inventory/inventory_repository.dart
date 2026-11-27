@@ -136,6 +136,18 @@ abstract interface class InventoryRepository {
     required String businessId,
     required String branchId,
   });
+
+  Future<String> createMovement({
+    required String businessId,
+    required String productId,
+    required String movementType,
+    required num quantity,
+    String? fromBranchId,
+    String? fromWarehouseId,
+    String? toBranchId,
+    String? toWarehouseId,
+    String? note,
+  });
 }
 
 class SupabaseInventoryRepository implements InventoryRepository {
@@ -242,6 +254,50 @@ class SupabaseInventoryRepository implements InventoryRepository {
               Map<String, dynamic>.from(row),
             ))
         .toList(growable: false);
+  }
+
+  @override
+  Future<String> createMovement({
+    required String businessId,
+    required String productId,
+    required String movementType,
+    required num quantity,
+    String? fromBranchId,
+    String? fromWarehouseId,
+    String? toBranchId,
+    String? toWarehouseId,
+    String? note,
+  }) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      throw const FormatException('Authentication required.');
+    }
+    if (quantity <= 0) {
+      throw const FormatException('Quantity must be positive.');
+    }
+
+    final row = await _client
+        .from('stock_movements')
+        .insert({
+          'business_id': businessId,
+          'product_id': productId,
+          'movement_type': movementType,
+          'quantity': quantity,
+          'from_branch_id': fromBranchId,
+          'from_warehouse_id': fromWarehouseId,
+          'to_branch_id': toBranchId,
+          'to_warehouse_id': toWarehouseId,
+          'note': _emptyToNull(note),
+          'created_by': userId,
+        })
+        .select('id')
+        .single();
+
+    final id = row['id'];
+    if (id is! String || id.isEmpty) {
+      throw const FormatException('Unexpected movement identifier.');
+    }
+    return id;
   }
 
   String? _emptyToNull(String? value) {
