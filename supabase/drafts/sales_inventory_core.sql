@@ -275,8 +275,51 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $$
+as $
+declare
+  v_product_type text;
+  v_product_status text;
 begin
+  select p.product_type, p.status
+  into v_product_type, v_product_status
+  from public.products p
+  where p.business_id = new.business_id and p.id = new.product_id;
+
+  if not found or v_product_type <> 'goods' or v_product_status <> 'active' then
+    raise exception 'Only active stockable goods can have stock movements'
+      using errcode = '22023';
+  end if;
+
+  if new.movement_type in ('out', 'transfer') and not exists (
+    select 1
+    from public.branches br
+    join public.warehouses w
+      on w.business_id = br.business_id
+     and w.branch_id = br.id
+     and w.id = new.from_warehouse_id
+    where br.business_id = new.business_id
+      and br.id = new.from_branch_id
+      and br.status = 'active'
+      and w.status = 'active'
+  ) then
+    raise exception 'Source branch or warehouse is inactive' using errcode = '22023';
+  end if;
+
+  if new.movement_type in ('in', 'transfer') and not exists (
+    select 1
+    from public.branches br
+    join public.warehouses w
+      on w.business_id = br.business_id
+     and w.branch_id = br.id
+     and w.id = new.to_warehouse_id
+    where br.business_id = new.business_id
+      and br.id = new.to_branch_id
+      and br.status = 'active'
+      and w.status = 'active'
+  ) then
+    raise exception 'Destination branch or warehouse is inactive' using errcode = '22023';
+  end if;
+
   if new.movement_type in ('out', 'transfer') then
     insert into public.stock_balances
       (business_id, branch_id, warehouse_id, product_id, quantity_on_hand)
