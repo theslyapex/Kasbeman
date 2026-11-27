@@ -19,6 +19,8 @@ class CustomersScreen extends StatefulWidget {
 
 class _CustomersScreenState extends State<CustomersScreen> {
   final _search = TextEditingController();
+  final Map<String, Future<List<SaleRecord>>> _purchaseHistory = {};
+  final Set<String> _expandedCustomers = {};
   late Future<List<CustomerRecord>> _future;
 
   @override
@@ -30,6 +32,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   void _load() {
     _future = widget.repository.fetchCustomers(widget.businessId);
+  }
+
+  Future<List<SaleRecord>> _historyFor(String customerId) {
+    return _purchaseHistory.putIfAbsent(
+      customerId,
+      () => widget.repository.fetchCustomerSales(
+        businessId: widget.businessId,
+        customerId: customerId,
+      ),
+    );
   }
 
   Future<void> _refresh() async {
@@ -151,7 +163,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             if (customer.phone?.isNotEmpty == true) customer.phone!,
                             if (customer.companyName?.isNotEmpty == true) customer.companyName!,
                           ].join(' • ')),
-                          children: [
+                          onExpansionChanged: (expanded) {
+                          setState(() {
+                            if (expanded) {
+                              _expandedCustomers.add(customer.id);
+                            } else {
+                              _expandedCustomers.remove(customer.id);
+                            }
+                          });
+                        },
+                        children: [
                             const Divider(height: 1),
                             _CustomerDetail(label: 'ایمیل', value: customer.email),
                             _CustomerDetail(label: 'نشانی', value: customer.address),
@@ -166,11 +187,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                 ],
                               ),
                             ),
-                            FutureBuilder<List<SaleRecord>>(
-                              future: widget.repository.fetchCustomerSales(
-                                businessId: widget.businessId,
-                                customerId: customer.id,
-                              ),
+                            if (!_expandedCustomers.contains(customer.id))
+                              const SizedBox.shrink()
+                            else
+                              FutureBuilder<List<SaleRecord>>(
+                              future: _historyFor(customer.id),
                               builder: (context, history) {
                                 if (history.connectionState == ConnectionState.waiting) {
                                   return const Padding(
