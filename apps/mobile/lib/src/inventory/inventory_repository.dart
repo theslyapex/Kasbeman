@@ -464,43 +464,45 @@ class SupabaseInventoryRepository implements InventoryRepository {
   }
 
   @override
+  @override
   Future<List<SaleRecord>> fetchCustomerSales({
     required String businessId,
     required String customerId,
   }) async {
-    Future<List<dynamic>> loadSales() async {
-      final allRows = <dynamic>[];
-      const pageSize = 500;
-      for (var offset = 0;; offset += pageSize) {
-        final page = await _client.from('sales')
-            .select(
-              'id,sale_number,customer_name,status,grand_total,created_at,confirmed_at,'
-              'sale_items!sale_items_sale_fkey(id,product_name_snapshot,quantity,'
-              'unit_price,discount_amount,tax_amount,line_total)',
-            )
-            .eq('business_id', businessId)
-            .eq('customer_id', customerId)
-            .eq('status', 'confirmed')
-            .order('created_at', ascending: false)
-            .range(offset, offset + pageSize - 1);
-        allRows.addAll(page);
-        if (page.length < pageSize) break;
-      }
-      return allRows;
+    const pageSize = 500;
+    final rows = <dynamic>[];
+    for (var offset = 0;; offset += pageSize) {
+      final page = await _client.from('sales')
+          .select(
+            'id,sale_number,customer_name,status,grand_total,created_at,confirmed_at,'
+            'sale_items!sale_items_sale_fkey(id,product_name_snapshot,quantity,'
+            'unit_price,discount_amount,tax_amount,line_total)',
+          )
+          .eq('business_id', businessId)
+          .eq('customer_id', customerId)
+          .eq('status', 'confirmed')
+          .order('created_at', ascending: false)
+          .order('id', ascending: false)
+          .range(offset, offset + pageSize - 1);
+      rows.addAll(page);
+      if (page.length < pageSize) break;
     }
 
-    final result = await Future.wait<Object>([
-      loadSales(),
-      _client.from('customer_invoice_balance_summary')
+    final saleIds = rows.map((row) => row['id'] as String).toList(growable: false);
+    final balances = <String, Map<String, dynamic>>{};
+    for (var offset = 0; offset < saleIds.length; offset += 500) {
+      final ids = saleIds.skip(offset).take(500).toList(growable: false);
+      final page = await _client.from('customer_invoice_balance_summary')
           .select('sale_id,total_received,balance_due')
           .eq('business_id', businessId)
-          .eq('customer_id', customerId),
-    ]);
-    final balances = <String, Map<String, dynamic>>{
-      for (final row in result[1] as List)
-        row['sale_id'] as String: Map<String, dynamic>.from(row),
-    };
-    return (result[0] as List).map((row) {
+          .eq('customer_id', customerId)
+          .inFilter('sale_id', ids);
+      for (final row in page) {
+        balances[row['sale_id'] as String] = Map<String, dynamic>.from(row);
+      }
+    }
+
+    return rows.map((row) {
       final sale = Map<String, dynamic>.from(row);
       final balance = balances[sale['id']] ?? const <String, dynamic>{};
       sale['paid_amount'] = balance['total_received'] ?? 0;
@@ -514,8 +516,8 @@ class SupabaseInventoryRepository implements InventoryRepository {
     required String businessId,
     required String customerId,
   }) async {
-    final allRows = <dynamic>[];
     const pageSize = 500;
+    final rows = <dynamic>[];
     for (var offset = 0;; offset += pageSize) {
       final page = await _client.from('customer_receipts')
           .select(
@@ -525,11 +527,12 @@ class SupabaseInventoryRepository implements InventoryRepository {
           .eq('business_id', businessId)
           .eq('customer_id', customerId)
           .order('received_at', ascending: false)
+          .order('id', ascending: false)
           .range(offset, offset + pageSize - 1);
-      allRows.addAll(page);
+      rows.addAll(page);
       if (page.length < pageSize) break;
     }
-    return allRows.map((row) => CustomerReceiptRecord.fromJson(
+    return rows.map((row) => CustomerReceiptRecord.fromJson(
       Map<String, dynamic>.from(row),
     )).toList(growable: false);
   }
