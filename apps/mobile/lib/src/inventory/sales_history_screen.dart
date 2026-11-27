@@ -159,7 +159,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                             if (sale.confirmedAt != null)
                               Padding(
                                 padding: const EdgeInsets.all(12),
-                                child: Text('تأیید در: ' + _date(sale.confirmedAt!)),
+                                child: Text('تأیید در: ${_date(sale.confirmedAt!)}'),
                               ),
                           ],
                         ),
