@@ -35,6 +35,8 @@ class CustomerStatementReport {
     required this.endDate,
     required this.openingBalance,
     required this.rows,
+    required this.totalDebit,
+    required this.totalCredit,
     required this.closingBalance,
   });
 
@@ -45,6 +47,8 @@ class CustomerStatementReport {
   final DateTime endDate;
   final num openingBalance;
   final List<CustomerStatementRow> rows;
+  final num totalDebit;
+  final num totalCredit;
   final num closingBalance;
 
   factory CustomerStatementReport.build({
@@ -110,6 +114,8 @@ class CustomerStatementReport {
       endDate: DateTime(endDate.year, endDate.month, endDate.day),
       openingBalance: opening,
       rows: List.unmodifiable(rows),
+      totalDebit: rows.fold<num>(0, (total, row) => total + row.debit),
+      totalCredit: rows.fold<num>(0, (total, row) => total + row.credit),
       closingBalance: balance,
     );
   }
@@ -151,6 +157,14 @@ class CustomerStatementExporter {
       ]);
     }
     sheet.appendRow([]);
+    sheet.appendRow([
+      TextCellValue('جمع بدهکار دوره'),
+      DoubleCellValue(report.totalDebit.toDouble()),
+    ]);
+    sheet.appendRow([
+      TextCellValue('جمع بستانکار دوره'),
+      DoubleCellValue(report.totalCredit.toDouble()),
+    ]);
     sheet.appendRow([
       TextCellValue('مانده پایان دوره'),
       DoubleCellValue(report.closingBalance.toDouble()),
@@ -222,6 +236,9 @@ class CustomerStatementExporter {
                 children: rows,
               ),
               pw.SizedBox(height: 12),
+              pw.Text('جمع بدهکار دوره: ${_number(report.totalDebit)} تومان'),
+              pw.Text('جمع بستانکار دوره: ${_number(report.totalCredit)} تومان'),
+              pw.SizedBox(height: 6),
               pw.Text('مانده پایان دوره: ${_signed(report.closingBalance)} تومان',
                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
               pw.SizedBox(height: 8),
