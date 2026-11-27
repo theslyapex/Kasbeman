@@ -471,14 +471,22 @@ begin
   end if;
 
   if new.movement_type in ('out', 'transfer') then
-    insert into public.stock_balances
-      (business_id, branch_id, warehouse_id, product_id, quantity_on_hand)
-    values
-      (new.business_id, new.from_branch_id, new.from_warehouse_id, new.product_id, -new.quantity)
-    on conflict (business_id, warehouse_id, product_id)
-    do update set
-      quantity_on_hand = public.stock_balances.quantity_on_hand + excluded.quantity_on_hand,
-      updated_at = now();
+    -- Update an existing balance atomically. Avoid inserting a negative
+    -- EXCLUDED row: PostgreSQL checks CHECK constraints before ON CONFLICT.
+    update public.stock_balances
+    set quantity_on_hand = quantity_on_hand - new.quantity,
+        updated_at = now()
+    where business_id = new.business_id
+      and branch_id = new.from_branch_id
+      and warehouse_id = new.from_warehouse_id
+      and product_id = new.product_id
+      and quantity_on_hand >= new.quantity;
+
+    if not found then
+      raise exception 'Insufficient stock for product % in warehouse %',
+        new.product_id, new.from_warehouse_id
+        using errcode = '23514';
+    end if;
   end if;
 
   if new.movement_type in ('in', 'transfer') then

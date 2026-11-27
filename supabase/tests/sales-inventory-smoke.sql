@@ -82,7 +82,47 @@ BEGIN
     RAISE EXCEPTION 'Invoice balance was not restored after receipt reversal';
   END IF;
 END
-$$;
+$;
+
+SELECT public.create_sale_draft(
+  :'business_id'::uuid,
+  :'branch_id'::uuid,
+  :'warehouse_id'::uuid,
+  'CI-SALE-002',
+  jsonb_build_array(jsonb_build_object(
+    'product_id', :'product_id'::uuid,
+    'quantity', 9,
+    'discount_amount', 0,
+    'tax_amount', 0
+  )),
+  :'customer_id'::uuid,
+  NULL,
+  'Insufficient stock rollback test'
+) AS insufficient_sale_id \\gset
+SELECT set_config('kasbeman.test_insufficient_sale_id', :'insufficient_sale_id', false);
+
+DO $
+BEGIN
+  BEGIN
+    PERFORM public.confirm_sale(current_setting('kasbeman.test_insufficient_sale_id')::uuid);
+    RAISE EXCEPTION 'Expected insufficient stock confirmation to fail';
+  EXCEPTION
+    WHEN check_violation THEN
+      NULL;
+  END;
+
+  IF (SELECT status FROM public.sales
+      WHERE id = current_setting('kasbeman.test_insufficient_sale_id')::uuid) <> 'draft' THEN
+    RAISE EXCEPTION 'Failed sale confirmation did not roll back sale status';
+  END IF;
+  IF (SELECT quantity_on_hand FROM public.stock_balances
+      WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
+        AND warehouse_id = current_setting('kasbeman.test_warehouse_id')::uuid
+        AND product_id = current_setting('kasbeman.test_product_id')::uuid) <> 8 THEN
+    RAISE EXCEPTION 'Failed sale confirmation changed stock balance';
+  END IF;
+END
+$;
 
 RESET ROLE;
 SET ROLE authenticated;
