@@ -1,4 +1,4 @@
-\\set ON_ERROR_STOP on
+\set ON_ERROR_STOP on
 
 INSERT INTO auth.users (id, raw_user_meta_data) VALUES
   ('10000000-0000-4000-8000-000000000001', '{"full_name":"Kasbeman Test Owner"}'),
@@ -7,33 +7,33 @@ INSERT INTO auth.users (id, raw_user_meta_data) VALUES
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 
-SELECT public.create_business('کسب‌وکار آزمایشی', 'kasbeman-ci-tenant') AS business_id \\gset
-SELECT id AS branch_id FROM public.branches WHERE business_id = current_setting('kasbeman.test_business_id')::uuid AND is_primary \\gset
-SELECT id AS warehouse_id FROM public.warehouses WHERE business_id = current_setting('kasbeman.test_business_id')::uuid AND is_default \\gset
+SELECT public.create_business('کسب‌وکار آزمایشی', 'kasbeman-ci-tenant') AS business_id \gset
+SELECT id AS branch_id FROM public.branches WHERE business_id = :'business_id'::uuid AND is_primary \gset
+SELECT id AS warehouse_id FROM public.warehouses WHERE business_id = :'business_id'::uuid AND is_default \gset
 
 INSERT INTO public.customers (business_id, name, created_by)
-VALUES (current_setting('kasbeman.test_business_id')::uuid, 'مشتری آزمایشی', auth.uid())
-RETURNING id AS customer_id \\gset
+VALUES (:'business_id'::uuid, 'مشتری آزمایشی', auth.uid())
+RETURNING id AS customer_id \gset
 
 INSERT INTO public.products (business_id, name, product_type, sale_price, purchase_price, created_by)
-VALUES (current_setting('kasbeman.test_business_id')::uuid, 'کالای آزمایشی', 'goods', 25, 10, auth.uid())
-RETURNING id AS product_id \\gset
+VALUES (:'business_id'::uuid, 'کالای آزمایشی', 'goods', 25, 10, auth.uid())
+RETURNING id AS product_id \gset
 
 INSERT INTO public.stock_movements (
   business_id, movement_type, product_id, quantity,
   to_branch_id, to_warehouse_id, created_by, note
 ) VALUES (
-  current_setting('kasbeman.test_business_id')::uuid, 'in', current_setting('kasbeman.test_product_id')::uuid, 10,
-  :'branch_id'::uuid, current_setting('kasbeman.test_warehouse_id')::uuid, auth.uid(), 'CI seed stock'
+  :'business_id'::uuid, 'in', :'product_id'::uuid, 10,
+  :'branch_id'::uuid, :'warehouse_id'::uuid, auth.uid(), 'CI seed stock'
 );
 
 SELECT public.create_sale_draft(
-  current_setting('kasbeman.test_business_id')::uuid,
+  :'business_id'::uuid,
   :'branch_id'::uuid,
-  current_setting('kasbeman.test_warehouse_id')::uuid,
+  :'warehouse_id'::uuid,
   'CI-SALE-001',
   jsonb_build_array(jsonb_build_object(
-    'product_id', current_setting('kasbeman.test_product_id')::uuid,
+    'product_id', :'product_id'::uuid,
     'quantity', 2,
     'discount_amount', 0,
     'tax_amount', 0
@@ -41,10 +41,11 @@ SELECT public.create_sale_draft(
   :'customer_id'::uuid,
   NULL,
   'PostgreSQL CI smoke test'
-) AS sale_id \\gset
+) AS sale_id \gset
 
-SELECT public.confirm_sale(current_setting('kasbeman.test_sale_id')::uuid);
-SELECT public.record_customer_receipt(current_setting('kasbeman.test_sale_id')::uuid, 50, 'cash') AS receipt_id \\gset
+SELECT public.confirm_sale(:'sale_id'::uuid);
+SELECT public.record_customer_receipt(:'sale_id'::uuid, 50, 'cash') AS receipt_id \gset
+
 SELECT set_config('kasbeman.test_business_id', :'business_id', false);
 SELECT set_config('kasbeman.test_warehouse_id', :'warehouse_id', false);
 SELECT set_config('kasbeman.test_product_id', :'product_id', false);
@@ -59,7 +60,8 @@ BEGIN
     RAISE EXCEPTION 'Stock confirmation did not deduct the expected quantity';
   END IF;
   IF (SELECT total_received FROM public.customer_invoice_balance_summary
-      WHERE business_id = current_setting('kasbeman.test_business_id')::uuid AND sale_id = current_setting('kasbeman.test_sale_id')::uuid) <> 50 THEN
+      WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
+        AND sale_id = current_setting('kasbeman.test_sale_id')::uuid) <> 50 THEN
     RAISE EXCEPTION 'Receipt was not reflected in the invoice balance summary';
   END IF;
 END
@@ -70,11 +72,13 @@ SELECT public.reverse_customer_receipt(:'receipt_id'::uuid, 'CI reversal test');
 DO $$
 BEGIN
   IF (SELECT total_received FROM public.customer_invoice_balance_summary
-      WHERE business_id = current_setting('kasbeman.test_business_id')::uuid AND sale_id = current_setting('kasbeman.test_sale_id')::uuid) <> 0 THEN
+      WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
+        AND sale_id = current_setting('kasbeman.test_sale_id')::uuid) <> 0 THEN
     RAISE EXCEPTION 'Receipt reversal was not reflected in the invoice balance summary';
   END IF;
   IF (SELECT balance_due FROM public.customer_invoice_balance_summary
-      WHERE business_id = current_setting('kasbeman.test_business_id')::uuid AND sale_id = current_setting('kasbeman.test_sale_id')::uuid) <> 50 THEN
+      WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
+        AND sale_id = current_setting('kasbeman.test_sale_id')::uuid) <> 50 THEN
     RAISE EXCEPTION 'Invoice balance was not restored after receipt reversal';
   END IF;
 END
