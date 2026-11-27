@@ -5,6 +5,7 @@ import '../workspace/workspace_repository.dart';
 import 'inventory_repository.dart';
 import 'inventory_movement_screen.dart';
 import 'inventory_history_screen.dart';
+import 'sales_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({
@@ -77,6 +78,24 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
   }
 
+  Future<void> _openSales() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => SalesScreen(
+          membership: widget.membership,
+          branch: widget.branch,
+          repository: _repository,
+        ),
+      ),
+    );
+    if (created == true && mounted) {
+      setState(_reload);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('فروش با موفقیت تأیید شد.')),
+      );
+    }
+  }
+
   Future<void> _addProduct() async {
     final created = await showModalBottomSheet<bool>(
       context: context,
@@ -115,6 +134,11 @@ class _InventoryScreenState extends State<InventoryScreen>
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'ثبت فروش',
+            onPressed: _openSales,
+            icon: const Icon(Icons.point_of_sale_outlined),
+          ),
           IconButton(
             tooltip: 'تاریخچه گردش',
             onPressed: _openHistory,
