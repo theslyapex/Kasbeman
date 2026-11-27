@@ -1,19 +1,66 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../workspace/create_branch_screen.dart';
 import '../workspace/workspace_repository.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.email,
     required this.membership,
+    required this.repository,
     required this.onSwitchWorkspace,
   });
 
   final String email;
   final BusinessMembership membership;
+  final WorkspaceRepository repository;
   final VoidCallback onSwitchWorkspace;
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late Future<List<BusinessBranch>> _branchesFuture;
+  BusinessBranch? _selectedBranch;
+
+  bool get _canManageBranches => widget.membership.roleKey == 'owner';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBranches();
+  }
+
+  void _loadBranches() {
+    _branchesFuture = widget.repository.fetchBranches(
+      widget.membership.businessId,
+    );
+  }
+
+  Future<void> _createBranch() async {
+    final createdId = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => CreateBranchScreen(
+          repository: widget.repository,
+          businessId: widget.membership.businessId,
+        ),
+      ),
+    );
+
+    if (createdId == null || !mounted) return;
+
+    setState(() {
+      _selectedBranch = null;
+      _loadBranches();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('شعبه با موفقیت ایجاد شد.')),
+    );
+  }
 
   Future<void> _signOut(BuildContext context) async {
     try {
@@ -31,11 +78,11 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(membership.businessName),
+        title: Text(widget.membership.businessName),
         actions: [
           IconButton(
             tooltip: 'تغییر فضای کاری',
-            onPressed: onSwitchWorkspace,
+            onPressed: widget.onSwitchWorkspace,
             icon: const Icon(Icons.swap_horiz),
           ),
           IconButton(
@@ -68,7 +115,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    membership.businessName,
+                    widget.membership.businessName,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: Colors.white,
@@ -78,11 +125,136 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'نقش شما: ${membership.roleLabel}',
+                    'نقش شما: ${widget.membership.roleLabel}',
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.white70),
                   ),
                   const SizedBox(height: 22),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'شعبه فعال',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 10),
+                          FutureBuilder<List<BusinessBranch>>(
+                            future: _branchesFuture,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const LinearProgressIndicator();
+                              }
+                              if (snapshot.hasError) {
+                                return Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    const Text(
+                                      'دریافت شعبه‌ها ناموفق بود.',
+                                      style: TextStyle(color: Colors.white70),
+                                    ),
+                                    TextButton.icon(
+                                      onPressed: () =>
+                                          setState(_loadBranches),
+                                      icon: const Icon(Icons.refresh),
+                                      label: const Text('تلاش دوباره'),
+                                    ),
+                                  ],
+                                );
+                              }
+
+                              final branches = snapshot.data ?? const [];
+                              if (branches.isEmpty) {
+                                return const Text(
+                                  'شعبه فعال برای این کسب‌وکار پیدا نشد.',
+                                  style: TextStyle(color: Colors.white70),
+                                );
+                              }
+
+                              final selected = branches.any(
+                                (branch) => branch.id == _selectedBranch?.id,
+                              )
+                                  ? _selectedBranch!
+                                  : branches.first;
+
+                              if (_selectedBranch?.id != selected.id) {
+                                WidgetsBinding.instance.addPostFrameCallback(
+                                  (_) {
+                                    if (mounted) {
+                                      setState(
+                                        () => _selectedBranch = selected,
+                                      );
+                                    }
+                                  },
+                                );
+                              }
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  DropdownButtonFormField<String>(
+                                    value: selected.id,
+                                    isExpanded: true,
+                                    decoration: const InputDecoration(
+                                      prefixIcon:
+                                          Icon(Icons.store_mall_directory),
+                                    ),
+                                    items: branches
+                                        .map(
+                                          (branch) =>
+                                              DropdownMenuItem<String>(
+                                            value: branch.id,
+                                            child: Text(
+                                              branch.isPrimary
+                                                  ? '${branch.name} (اصلی)'
+                                                  : branch.name,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (id) {
+                                      final next = branches
+                                          .where((branch) => branch.id == id)
+                                          .firstOrNull;
+                                      if (next != null) {
+                                        setState(
+                                          () => _selectedBranch = next,
+                                        );
+                                      }
+                                    },
+                                  ),
+                                  if (selected.code != null &&
+                                      selected.code!.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'کد شعبه: ${selected.code}',
+                                      style: const TextStyle(
+                                        color: Colors.white60,
+                                      ),
+                                    ),
+                                  ],
+                                  if (_canManageBranches) ...[
+                                    const SizedBox(height: 12),
+                                    OutlinedButton.icon(
+                                      onPressed: _createBranch,
+                                      icon: const Icon(Icons.add_business),
+                                      label: const Text('افزودن شعبه'),
+                                    ),
+                                  ],
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(18),
@@ -95,7 +267,7 @@ class HomeScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            email,
+                            widget.email,
                             textDirection: TextDirection.ltr,
                             style: const TextStyle(color: Colors.white70),
                           ),
@@ -103,7 +275,7 @@ class HomeScreen extends StatelessWidget {
                           const Divider(color: Colors.white12),
                           const SizedBox(height: 8),
                           const Text(
-                            'اتصال به عضویت کسب‌وکار از دیتابیس برقرار است. ماژول‌های عملیاتی در مراحل بعدی به این فضای کاری متصل می‌شوند.',
+                            'اطلاعات شعبه انتخاب‌شده در ادامه به ماژول‌های عملیاتی مانند فروش، انبار و گزارش‌ها متصل می‌شود.',
                             style: TextStyle(
                               color: Colors.white70,
                               height: 1.8,
@@ -115,7 +287,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
-                    onPressed: onSwitchWorkspace,
+                    onPressed: widget.onSwitchWorkspace,
                     icon: const Icon(Icons.swap_horiz),
                     label: const Text('تغییر فضای کاری'),
                   ),
