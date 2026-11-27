@@ -62,6 +62,13 @@ class _FakeWorkspaceRepository implements WorkspaceRepository {
           code: 'MAIN',
           isPrimary: true,
         ),
+        BusinessBranch(
+          id: 'branch-north',
+          businessId: businessId,
+          name: 'شعبه شمال',
+          code: 'NORTH',
+          isPrimary: false,
+        ),
       ];
 
   @override
@@ -139,12 +146,19 @@ void main() {
       roleKey: 'owner',
     );
 
+    final selectionStore = _FakeBranchSelectionStore();
+    await selectionStore.write(
+      userId: 'local-user',
+      businessId: 'business-1',
+      branchId: 'branch-north',
+    );
+
     await tester.pumpWidget(
       MaterialApp(
         home: WorkspaceScreen(
           email: 'user@example.com',
           repository: _FakeWorkspaceRepository([membership]),
-          branchSelectionStore: _FakeBranchSelectionStore(),
+          branchSelectionStore: selectionStore,
         ),
       ),
     );
@@ -158,5 +172,6 @@ void main() {
 
     expect(find.text('فضای کاری شما آماده است'), findsOneWidget);
     expect(find.text('فروشگاه نمونه'), findsNWidgets(2));
+    expect(find.text('شعبه شمال'), findsOneWidget);
   });
 }
