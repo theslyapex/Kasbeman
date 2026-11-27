@@ -27,6 +27,14 @@ join public.permissions p
 where r.is_system and r.role_key in ('owner', 'admin')
 on conflict do nothing;
 
+-- Users who can read or manage sales also need customer read access for
+-- selecting a customer on an invoice and reviewing the customer's purchase history.
+insert into public.role_permissions (business_id, role_id, permission_key)
+select rp.business_id, rp.role_id, 'customers.read'
+from public.role_permissions rp
+where rp.permission_key in ('sales.orders.read', 'sales.orders.manage')
+on conflict do nothing;
+
 create table public.products (
   id uuid primary key default gen_random_uuid(),
   business_id uuid not null references public.businesses(id) on delete cascade,
