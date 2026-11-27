@@ -225,10 +225,10 @@ class _BalancesTab extends StatelessWidget {
                   Icons.stacked_bar_chart,
                   color: Color(0xFF00D8E8),
                 ),
-                title: Text('کالا: ${balance.productId.substring(0, 8)}'),
-                subtitle: Text('انبار: ${balance.warehouseId.substring(0, 8)}'),
+                title: Text(balance.productName),
+                subtitle: Text('انبار: ${balance.warehouseName} • واحد: ${balance.unitName}'),
                 trailing: Text(
-                  _quantity(balance.quantity),
+                  '${_quantity(balance.quantity)} ${balance.unitName}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
