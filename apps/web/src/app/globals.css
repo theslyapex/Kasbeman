@@ -340,3 +340,52 @@ h1 span {
   .team-row { align-items: flex-start; flex-direction: column; }
   .team-row-actions { width: 100%; justify-content: space-between; }
 }
+
+
+.team-permission-group {
+  border-top: 1px solid rgba(148, 163, 184, .18);
+  padding-top: 14px;
+  margin-top: 14px;
+}
+.team-permission-group h4 {
+  margin: 0 0 10px;
+  color: #b8c5d8;
+  font-size: .92rem;
+}
+.team-permission-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 8px;
+}
+.team-permission {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, .28);
+  cursor: pointer;
+}
+.team-permission input {
+  margin-top: 4px;
+  accent-color: #22d3ee;
+}
+.team-permission span {
+  display: grid;
+  gap: 3px;
+}
+.team-permission strong {
+  font-size: .88rem;
+}
+.team-permission small {
+  color: #94a3b8;
+  font-size: .76rem;
+  line-height: 1.6;
+}
+.team-permission:has(input:disabled) {
+  opacity: .58;
+}
+.team-form h3 {
+  margin: 12px 0 6px;
+}
