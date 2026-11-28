@@ -115,11 +115,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pnpm dlx --package=@playwright/test@1.56.1 -- sh -c '
-            export PLAYWRIGHT_CLI_PATH="$(readlink -f "$(command -v playwright)")"
-            playwright install --with-deps chromium
-            playwright test --config playwright.config.mjs
-          '
+          npm install --prefix /tmp/kasbeman-playwright --no-save --package-lock=false @playwright/test@1.56.1
+          export PLAYWRIGHT_CLI_PATH="$(realpath /tmp/kasbeman-playwright/node_modules/.bin/playwright)"
+          /tmp/kasbeman-playwright/node_modules/.bin/playwright install --with-deps chromium
+          /tmp/kasbeman-playwright/node_modules/.bin/playwright test --config playwright.config.mjs
 
       - name: Run Flutter UI E2E against local Supabase Auth and Data API
         working-directory: apps/mobile
