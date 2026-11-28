@@ -22,7 +22,7 @@ begin
   for update;
 
   if old.status = 'active' and new.status in ('suspended', 'revoked') then
-    if exists (
+    if old.role_key = 'owner' or exists (
       select 1
       from public.member_role_assignments mra
       join public.roles r
@@ -302,6 +302,7 @@ as $$
       where bm.business_id = p_business_id
         and bm.user_id = p_target_user_id
         and bm.status = 'active'
+        and bm.role_key <> 'owner'
     )
     and not exists (
       select 1
