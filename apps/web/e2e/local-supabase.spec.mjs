@@ -54,4 +54,12 @@ test("web signup, workspace, CRM customer and ticket flow against local Supabase
   await page.getByPlaceholder("پیام خود را بنویسید...").fill(ticketComment);
   await page.getByRole("button", { name: "ارسال پیام" }).click();
   await expect(page.getByText(ticketComment)).toBeVisible();
+
+  await page.getByRole("button", { name: "خروج از حساب" }).click();
+  await expect(page).toHaveURL(/\\/login$/);
+  await page.getByLabel("ایمیل").fill(email);
+  await page.getByLabel("رمز عبور").fill(password);
+  await page.getByRole("button", { name: "ورود به حساب" }).click();
+  await expect(page).toHaveURL(/\\/dashboard(?:\\?.*)?$/);
+  await expect(page.getByRole("heading", { name: businessName })).toBeVisible();
 });
