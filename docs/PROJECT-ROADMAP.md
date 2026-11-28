@@ -8,10 +8,10 @@
 
 | بخش | پیشرفت تخمینی | وضعیت |
 |---|---:|---|
-| کل محصول نسبت به دامنه توافق‌شده | **۲۸٪** | هسته CRM مشتریان در دیتابیس canonical و CI-tested است و فضای مدیریت مشتریان وب تکمیل CI شده؛ استقرار و اتصال E2E باقی است |
+| کل محصول نسبت به دامنه توافق‌شده | **۲۹٪** | هسته CRM و تیکت هر دو migration canonical و آزمون CI دارند؛ فضای مدیریت مشتریان وب نیز تکمیل CI شده، اما استقرار و اتصال E2E باقی است |
 | وب‌اپلیکیشن Next.js | **۲۳٪** | جریان حساب/فضای کاری، مرکز تیکت و فضای مدیریت مشتریان با ثبت/جست‌وجو/ویرایش/بایگانی؛ TypeScript، ESLint و Production build موفق CI |
 | اپلیکیشن Flutter | **۳۴٪** | جریان حساب/فضای کاری، ماژول‌های عملیاتی و مرکز تیکت؛ analyze، تست و Android Debug CI موفق |
-| بک‌اند و دیتابیس Supabase | **۳۳٪** | migration canonical هسته CRM با Supabase CLI ساخته و در PostgreSQL 17 با آزمون‌های مجوز، tenant isolation و concurrency تأیید شده؛ هنوز روی پروژه اصلی اعمال نشده |
+| بک‌اند و دیتابیس Supabase | **۳۴٪** | migrationهای canonical CRM و تیکت با Supabase CLI ساخته و در PostgreSQL 17 با آزمون‌های مجوز، tenant isolation و concurrency تأیید شده‌اند؛ هنوز روی پروژه اصلی اعمال نشده‌اند |
 | استقرار و نسخه قابل تست عمومی | **۰٪** | هنوز مستقر نشده |
 
 این درصدها تخمین مدیریتی از کل محصول هستند، نه درصد تست موفق یا شمارش خطوط کد. کدهای آماده‌ای که به دیتابیس اعمال‌نشده وابسته‌اند، «تکمیل عملیاتی» محسوب نمی‌شوند.
@@ -48,6 +48,7 @@
 - [x] بخش‌هایی از مدیریت مشتریان
 - [x] جداسازی هسته مستقل مشتریان CRM از طرح فروش/انبار و آزمون مستقل مجوزهای مشاهده/ایجاد/ویرایش/بایگانی
 - [x] تولید migration استاندارد CRM با Supabase CLI و اجرای خود migration در آزمون PostgreSQL 17
+- [x] تولید migration استاندارد تیکت با Supabase CLI و اجرای آن پس از CRM در آزمون PostgreSQL 17
 - [x] بخش‌هایی از فروش و فاکتور
 - [x] بخش‌هایی از انبار و گردش موجودی
 - [x] خروجی صورت‌حساب مشتری PDF و Excel در موبایل
@@ -65,7 +66,7 @@
 - [ ] آزمون end-to-end با پروژه Supabase آزمایشی واقعی و کلاینت‌های وب/موبایل
 - [ ] تکمیل دفتر حساب‌ها، اسناد و گزارش‌های حسابداری
 - [ ] تکمیل اتصال رابط‌های وب و موبایل به انبارهای چندگانه و انتقال بین انبارها
-- وضعیت: **هسته CRM مشتریان به migration canonical تبدیل شده و خود migration در PostgreSQL 17 CI با آزمون‌های مجوز، tenant isolation و concurrency موفق است؛ هسته فروش/انبار بخشی از پیاده‌سازی است؛ مرکز تیکت در وب و Flutter پیاده‌سازی شده و آزمون‌های امنیتی آن نیز موفق‌اند. اعمال روی پروژه اصلی و اتصال E2E هنوز باقی است.**
+- وضعیت: **هسته CRM و تیکت هر دو migration canonical دارند و در PostgreSQL 17 CI با آزمون‌های مجوز، tenant isolation و concurrency موفق‌اند؛ هسته فروش/انبار بخشی از پیاده‌سازی است. اعمال در staging و production و اتصال E2E هنوز باقی است.**
 
 ### فاز ۴ — وب‌اپلیکیشن و پنل‌های مدیریتی
 - [x] صفحه معرفی اولیه
@@ -105,6 +106,7 @@
 ### فاز ۷ — کیفیت، استقرار و عرضه
 - [x] CI وب و دیتابیس: PostgreSQL 17، tenant/RLS/RBAC، آزمون چنداتصالی، TypeScript، ESLint و Production build موفق برای commit `2d3dd8c` ([run](https://github.com/theslyapex/Kasbeman/actions/runs/46142375026))
 - [x] CI وب/دیتابیس برای CRM مستقل و رابط مشتریان: آزمون migration canonical، CRM، فروش/انبار، تیکت، جداسازی tenant، concurrency، vinext، TypeScript، ESLint و Production build موفق برای commit `a7f82fe52efdb925bc981cab6172e5a72f05fa45` ([run](https://github.com/theslyapex/Kasbeman/actions/runs/46146010427))
+- [x] CI وب/دیتابیس برای migration canonical تیکت: checker امنیتی تیکت، CRM، PostgreSQL 17، tenant isolation، concurrency، vinext، TypeScript، ESLint و Production build موفق برای commit `4f5b2749e8b3a9ed42a74b5cdecdcd39c690f1f3` ([run](https://github.com/theslyapex/Kasbeman/actions/runs/46146306032))
 - [x] CI رابط مشتریان وب: TypeScript، ESLint، PostgreSQL 17، concurrency و Production build موفق برای commit `e9f59df4947288ab948b90e8c6cd84c03ddb2ba5` ([run](https://github.com/theslyapex/Kasbeman/actions/runs/46145348146))
 - [x] CI موبایل: Flutter Analyze، تست‌ها و Android Debug build موفق برای commit `fed6e3fd1282e6411a10b062ef6fd37544a7deed` ([run](https://github.com/theslyapex/Kasbeman/actions/runs/46145316201))
 - [x] CI موبایل: Flutter analyze، تست‌ها و Android Debug build موفق برای commit `1392904` ([run](https://github.com/theslyapex/Kasbeman/actions/runs/46141005622))
@@ -312,3 +314,13 @@
 - بررسی read-only پروژه میزبانی‌شده وجود چهار کلید مجوز CRM را در کاتالوگ تأیید کرد؛ اما جدول مشتریان هنوز وجود ندارد و migration CRM در تاریخچه production ثبت نشده است.
 - migration فقط در مخزن و دیتابیس موقت CI است؛ staging واقعی، اتصال E2E و تأیید rollout باقی است. هیچ SQL تغییردهنده‌ای روی پروژه اصلی اجرا نشده و شاخه `main` بدون تغییر است.
 - درصدها به‌روزرسانی شدند: کل ۲۸٪، وب ۲۳٪، موبایل ۳۴٪، بک‌اند/دیتابیس ۳۳٪، استقرار ۰٪.
+
+
+## تولید migration استاندارد و آزمون مستقل ماژول تیکت (۲۰۲۶-۱۱-۲۸)
+
+- migration `20261128124535_ticketing_core.sql` با Supabase CLI نسخه 3.4.0 ایجاد شد؛ ترتیب آن بعد از migration CRM است.
+- اسکریپت PostgreSQL اکنون ابتدا CRM canonical، سپس draft فروش/انبار و بعد migration canonical تیکت را اعمال می‌کند؛ آزمون‌های CRM و تیکت و جداسازی tenant بعد از آن اجرا می‌شوند.
+- checker جدید `scripts/check-ticketing-security.mjs` برابری بدنه migration با draft، فعال بودن RLS، سیاست‌های خواندن/نوشتن، مجوزهای یادداشت داخلی، کلید خارجی مرکب مشتری، append-only بودن رویدادها، حذف‌نشدن متن پیام از audit و ACL توابع trigger را کنترل می‌کند.
+- CI برای commit `4f5b2749e8b3a9ed42a74b5cdecdcd39c690f1f3` موفق شد؛ شامل checkerهای امنیتی CRM و تیکت، PostgreSQL 17 schema/tenant tests، concurrency چنداتصالی، vinext، TypeScript، ESLint و Production build ([اجرای موفق](https://github.com/theslyapex/Kasbeman/actions/runs/46146306032)).
+- این migrationها فقط در مخزن و دیتابیس موقت CI هستند. پروژه Supabase اصلی همچنان بدون جدول customers/tickets است و هیچ SQL تغییردهنده‌ای روی آن اجرا نشده است. برای staging باید محیط جداگانه و هزینه احتمالی آن بررسی شود؛ اعمال روی production همچنان نیازمند تأیید صریح است.
+- درصدها به‌روزرسانی شدند: کل ۲۹٪، وب ۲۳٪، موبایل ۳۴٪، بک‌اند/دیتابیس ۳۴٪، استقرار ۰٪.
