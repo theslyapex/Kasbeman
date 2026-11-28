@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   addTicketCommentAction, createTicketAction, updateTicketContentAction,
@@ -48,10 +48,7 @@ export function TicketsPanel(props:{
  const [newBranch,setNewBranch]=useState(createBranches.find(x=>x.isPrimary)?.id??createBranches[0]?.id??"");
  const [newPriority,setNewPriority]=useState("normal");
 
- useEffect(()=>{
-   if(selectedId===null&&props.tickets[0])setSelectedId(props.tickets[0].id);
- },[props.tickets,selectedId]);
- const selected=props.tickets.find(t=>t.id===selectedId)??null;
+ const selected=props.tickets.find(t=>t.id===selectedId)??(selectedId===null?props.tickets[0]??null:null);
  const selectedPermissions=selected?permissionsFor(selected.branch_id):new Set<string>();
  const visible=useMemo(()=>props.tickets.filter(t=>
    (filter==="all"||t.status===filter) &&
