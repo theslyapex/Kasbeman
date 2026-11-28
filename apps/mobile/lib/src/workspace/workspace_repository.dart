@@ -60,6 +60,10 @@ class BusinessBranch {
   }
 }
 
+class BusinessCreationRateLimitException implements Exception {
+  const BusinessCreationRateLimitException();
+}
+
 abstract interface class WorkspaceRepository {
   Future<List<BusinessMembership>> fetchMyBusinesses();
 
@@ -130,6 +134,9 @@ class SupabaseWorkspaceRepository implements WorkspaceRepository {
       },
     );
 
+    if (result == null) {
+      throw const BusinessCreationRateLimitException();
+    }
     if (result is! String || result.isEmpty) {
       throw const FormatException('Unexpected business identifier.');
     }
