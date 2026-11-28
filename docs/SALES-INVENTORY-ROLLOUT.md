@@ -1,7 +1,7 @@
 # Sales & Inventory Core — Rollout Gate
 
 Date: 2026-11-28  
-Status: **Canonical migration and combined PostgreSQL 17 CI validation passed; hosted rollout remains gated.**
+Status: **Canonical migration, PostgreSQL 17 CI and local Supabase Auth/Data API integration passed; hosted rollout remains gated.**
 
 ## Canonical assets
 
@@ -43,14 +43,23 @@ Verified successful steps:
 - Multi-connection concurrency: competing sale confirmations, same-key receipt retries and competing warehouse transfers.
 - TypeScript, ESLint and Next.js production build.
 
+## Real local Supabase integration
+
+- Local Supabase CLI configuration: `supabase/config.toml`.
+- Integration runner: `scripts/test-supabase-local.sh`.
+- The canonical migration chain was reset and applied inside a disposable local Supabase stack.
+- Real Auth signup/session, profile trigger, authenticated PostgREST profile read, `create_business` RPC and tenant-scoped business read passed.
+- Existing sales/inventory, CRM, ticketing, RLS/RBAC, membership, FK and multi-connection concurrency suites also passed against that local Supabase PostgreSQL 17 instance.
+- Commit: `110356d6ad3591b90290c2a34a09294ad20f3f1e`; run: https://github.com/theslyapex/Kasbeman/actions/runs/46147757682.
+
 ## Release blockers
 
 - No live Supabase staging environment has been created; current verification uses ephemeral PostgreSQL 17 in GitHub Actions.
-- Supabase Auth is represented by the CI bootstrap shim, so real hosted Auth/Data API behavior and generated client types still require separate verification.
+- Real Supabase Auth and Data API behavior has now been exercised against a local Supabase stack. Hosted staging behavior, production Auth configuration and generated client types still require separate verification.
 - Web and mobile have not completed live end-to-end testing against these migrations.
 - The canonical migration has not been applied to production. Production changes require explicit user approval.
 - Keep changes on `foundation/bootstrap`; do not merge to `main` without explicit authorization.
 
 ## Conclusion
 
-The database schema and security smoke tests for the combined CRM, ticketing and sales/inventory stack passed in free-tier-compatible ephemeral CI. This is a strong pre-staging validation, not a production deployment sign-off. No Supabase staging branch or additional paid environment was created, and no production data/schema was changed.
+The database schema and security smoke tests for the combined CRM, ticketing and sales/inventory stack passed in both disposable PostgreSQL CI and a local Supabase stack with real Auth and Data API. This is a strong pre-staging validation, not a production deployment sign-off. No Supabase staging branch or additional paid environment was created, and no production data/schema was changed.
