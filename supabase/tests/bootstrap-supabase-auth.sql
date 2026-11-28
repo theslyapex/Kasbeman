@@ -15,7 +15,9 @@ CREATE SCHEMA extensions;
 CREATE SCHEMA auth;
 CREATE TABLE auth.users (
   id uuid PRIMARY KEY,
-  raw_user_meta_data jsonb NOT NULL DEFAULT '{}'::jsonb
+  raw_user_meta_data jsonb NOT NULL DEFAULT '{}'::jsonb,
+  email text UNIQUE,
+  email_confirmed_at timestamptz
 );
 
 CREATE OR REPLACE FUNCTION auth.uid()
