@@ -242,6 +242,32 @@ create index customers_business_status_name_idx
 create index customers_business_phone_idx
   on public.customers (business_id, phone) where phone is not null;
 
+-- A customer profile editor must not gain archive/restore rights implicitly.
+-- Status transitions are a separate destructive CRM operation.
+create or replace function private.guard_customer_status_permission()
+returns trigger
+language plpgsql
+set search_path = ''
+as $
+begin
+  if new.status is distinct from old.status
+     and not (select private.has_business_permission(
+       new.business_id, 'crm.customers.delete', null
+     )) then
+    raise exception 'Insufficient permission to change customer archive status'
+      using errcode = '42501';
+  end if;
+  return new;
+end;
+$;
+
+revoke all on function private.guard_customer_status_permission()
+  from public, anon, authenticated;
+
+create trigger customers_status_permission_guard
+  before update of status on public.customers
+  for each row execute function private.guard_customer_status_permission();
+
 -- Sales are branch- and warehouse-bound. Drafts may be edited; confirmation
 -- atomically records stock-out movements and changes the sale state.
 create table public.sales (
