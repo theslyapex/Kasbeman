@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../workspace/workspace_repository.dart';
+import 'role_management_screen.dart';
 
 class TeamScreen extends StatefulWidget {
   const TeamScreen({super.key, required this.membership, required this.permissions});
@@ -228,7 +229,21 @@ class _TeamScreenState extends State<TeamScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('مدیریت اعضا')),
+      appBar: AppBar(
+        title: const Text('مدیریت اعضا'),
+        actions: [
+          if (widget.permissions.contains('team.roles.manage'))
+            IconButton(
+              tooltip: 'نقش‌ها و مجوزها',
+              onPressed: _busy ? null : () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => RoleManagementScreen(businessId: _businessId),
+                ),
+              ),
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+            ),
+        ],
+      ),
       body: SafeArea(child: Center(child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680),
         child: _loading ? const Center(child: CircularProgressIndicator())
