@@ -10,8 +10,10 @@ class SalesScreen extends StatefulWidget {
     required this.membership,
     required this.branch,
     required this.repository,
+    required this.permissions,
   });
 
+  final Set<String> permissions;
   final BusinessMembership membership;
   final BusinessBranch branch;
   final InventoryRepository repository;
@@ -30,7 +32,9 @@ class _SalesScreenState extends State<SalesScreen> {
   @override
   void initState() {
     super.initState();
-    _data = _load();
+    _data = widget.permissions.contains('sales.invoices.manage')
+        ? _load()
+        : Future.error(StateError('sales.invoices.manage permission required'));
   }
 
   Future<({
@@ -55,6 +59,11 @@ class _SalesScreenState extends State<SalesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.permissions.contains('sales.invoices.manage')) {
+      return const Scaffold(
+        body: Center(child: Text('برای ثبت فروش مجوز کافی نداری.')),
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('ثبت فروش')),
       body: FutureBuilder<({

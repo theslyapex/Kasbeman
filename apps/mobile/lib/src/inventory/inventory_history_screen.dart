@@ -9,8 +9,10 @@ class InventoryHistoryScreen extends StatefulWidget {
     required this.membership,
     required this.branch,
     required this.repository,
+    required this.permissions,
   });
 
+  final Set<String> permissions;
   final BusinessMembership membership;
   final BusinessBranch branch;
   final InventoryRepository repository;
@@ -27,7 +29,11 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    if (widget.permissions.contains('inventory.stock.read')) {
+      _load();
+    } else {
+      _future = Future.error(StateError('inventory.stock.read permission required'));
+    }
   }
 
   void _load() {
@@ -65,8 +71,13 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.permissions.contains('inventory.stock.read')) {
+      return const Scaffold(
+        body: Center(child: Text('برای مشاهده تاریخچه موجودی مجوز کافی نداری.')),
+      );
+    }
     return Scaffold(
-      appBar: AppBar(
+      appBar: AppBar,
         title: const Text('تاریخچه گردش انبار'),
         actions: [
           IconButton(

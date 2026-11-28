@@ -62,6 +62,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           membership: widget.membership,
           branch: widget.branch,
           repository: _repository,
+          permissions: widget.permissions,
         ),
       ),
     );
@@ -74,6 +75,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           membership: widget.membership,
           branch: widget.branch,
           repository: _repository,
+          permissions: widget.permissions,
         ),
       ),
     );
@@ -104,6 +106,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           membership: widget.membership,
           branch: widget.branch,
           repository: _repository,
+          permissions: widget.permissions,
         ),
       ),
     );
@@ -116,6 +119,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           membership: widget.membership,
           branch: widget.branch,
           repository: _repository,
+          permissions: widget.permissions,
         ),
       ),
     );

@@ -9,8 +9,10 @@ class SalesHistoryScreen extends StatefulWidget {
     required this.membership,
     required this.branch,
     required this.repository,
+    required this.permissions,
   });
 
+  final Set<String> permissions;
   final BusinessMembership membership;
   final BusinessBranch branch;
   final InventoryRepository repository;
@@ -27,7 +29,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    if (widget.permissions.contains('sales.invoices.read')) {
+      _load();
+    } else {
+      _future = Future.error(StateError('sales.invoices.read permission required'));
+    }
     _search.addListener(() => setState(() {}));
   }
 
@@ -52,6 +58,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.permissions.contains('sales.invoices.read')) {
+      return const Scaffold(
+        body: Center(child: Text('برای مشاهده فهرست فروش‌ها مجوز کافی نداری.')),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('فروش‌های شعبه'),

@@ -10,8 +10,10 @@ class InventoryMovementScreen extends StatefulWidget {
     required this.membership,
     required this.branch,
     required this.repository,
+    required this.permissions,
   });
 
+  final Set<String> permissions;
   final BusinessMembership membership;
   final BusinessBranch branch;
   final InventoryRepository repository;
@@ -28,7 +30,9 @@ class _InventoryMovementScreenState extends State<InventoryMovementScreen> {
   @override
   void initState() {
     super.initState();
-    _data = _load();
+    _data = widget.permissions.contains('inventory.stock.manage')
+        ? _load()
+        : Future.error(StateError('inventory.stock.manage permission required'));
   }
 
   Future<({List<InventoryProduct> products, List<InventoryWarehouse> warehouses})>
@@ -48,6 +52,11 @@ class _InventoryMovementScreenState extends State<InventoryMovementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.permissions.contains('inventory.stock.manage')) {
+      return const Scaffold(
+        body: Center(child: Text('برای مدیریت موجودی مجوز کافی نداری.')),
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('گردش موجودی')),
       body: FutureBuilder<
