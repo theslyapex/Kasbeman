@@ -64,6 +64,9 @@ jobs:
       - name: Validate CRM SQL security structure
         run: node scripts/check-crm-security.mjs
 
+      - name: Validate ticketing SQL security structure
+        run: node scripts/check-ticketing-security.mjs
+
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update
