@@ -19,10 +19,11 @@ class CustomersScreen extends StatefulWidget {
   final InventoryRepository repository;
   final Set<String> permissions;
 
-  bool get _canEdit => permissions.contains('crm.customers.update');
-  bool get _canArchive =>
-      permissions.contains('crm.customers.delete') &&
+  bool get _canEdit =>
+      permissions.contains('crm.customers.read') &&
       permissions.contains('crm.customers.update');
+  bool get _canArchive =>
+      _canEdit && permissions.contains('crm.customers.delete');
   bool get _canCreate => permissions.contains('crm.customers.create');
   bool get _canReceive => permissions.contains('finance.payments.manage');
   bool get _canReadPayments =>
