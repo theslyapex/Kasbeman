@@ -1,7 +1,7 @@
 # Ticketing Module — Production Rollout Gate
 
 Date: 2026-11-28  
-Status: **Web/mobile implementation and both CRM and ticketing canonical migrations are CI-tested; production rollout and live E2E remain gated.**
+Status: **Web/mobile implementation and canonical migrations passed PostgreSQL CI plus local Supabase Auth/Data API integration; hosted rollout and live client E2E remain gated.**
 
 ## Current implementation
 
@@ -16,6 +16,7 @@ Status: **Web/mobile implementation and both CRM and ticketing canonical migrati
 - Canonical CRM migration and combined PostgreSQL suite passed on commit `a7f82fe52efdb925bc981cab6172e5a72f05fa45` (https://github.com/theslyapex/Kasbeman/actions/runs/46146010427).
 - Canonical ticketing migration, static security checks, PostgreSQL 17 tenant/permission tests, concurrency, TypeScript, ESLint and Production build passed on commit `4f5b2749e8b3a9ed42a74b5cdecdcd39c690f1f3` (https://github.com/theslyapex/Kasbeman/actions/runs/46146306032).
 - Combined canonical CRM + ticketing + sales/inventory run passed on commit `f3b08c98a5725bc07b1e8fa80fc1a8c4f61786fc`; PostgreSQL 17 smoke tests, security checkers, multi-connection concurrency, TypeScript, ESLint and Production build all succeeded (https://github.com/theslyapex/Kasbeman/actions/runs/46146525793).
+- Local Supabase integration passed on commit `110356d6ad3591b90290c2a34a09294ad20f3f1e`: real Auth signup/session, profile trigger, authenticated PostgREST/RLS, tenant creation RPC, all CRM/ticketing/sales SQL smoke tests and concurrency suite (https://github.com/theslyapex/Kasbeman/actions/runs/46147757682).
 
 ## Production dependency discovered
 
@@ -42,7 +43,7 @@ The sales/inventory core remains a draft. The CRM customer foundation is now iso
 
 ## Release blockers / safeguards
 
-- Ticketing canonical migration exists and passed PostgreSQL 17 CI, but has not been applied to production.
+- Ticketing canonical migration exists and passed PostgreSQL 17 CI plus local Supabase integration, but has not been applied to production.
 - CRM canonical migration exists and passed PostgreSQL 17 CI, but has not been applied to production.
 - Do not add a placeholder customer table to production merely to satisfy the ticket foreign key.
 - Do not disable or weaken the customer foreign key, RLS, or permission guards to bypass the dependency.
@@ -51,4 +52,4 @@ The sales/inventory core remains a draft. The CRM customer foundation is now iso
 
 ## Current conclusion
 
-Ticketing implementation, canonical migration and CI coverage are in place. The combined canonical CRM, ticketing and sales/inventory stack now passes the disposable PostgreSQL 17 suite, but the modules are **not production-ready for deployment** until the hosted baseline is reviewed, the migrations are applied to a separate staging environment, and web/mobile clients pass live E2E. No production schema changes have been applied. CI does not prove that the modules can be applied to the current hosted production schema.
+Ticketing implementation, canonical migration and CI coverage are in place. The combined canonical CRM, ticketing and sales/inventory stack now passes disposable PostgreSQL 17 CI and a local Supabase stack with real Auth/Data API, but the modules are **not production-ready for deployment** until the hosted baseline is reviewed, hosted staging is verified, and web/mobile clients pass live E2E. No production schema changes have been applied. CI does not prove that the modules can be applied to the current hosted production schema.
