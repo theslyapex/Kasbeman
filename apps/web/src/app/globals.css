@@ -328,7 +328,8 @@ h1 span {
 .team-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 14px; border: 1px solid rgba(220,229,240,.08); border-radius: 12px; background: rgba(3,14,27,.28); }
 .team-row > div:first-child { display: grid; gap: 6px; min-width: 0; }
 .team-row small { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
-.team-row-actions { display: flex; align-items: center; gap: 12px; }
+.team-row-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.team-row-actions select { min-height: 40px; padding: 8px 10px; border: 1px solid rgba(220,229,240,.14); border-radius: 10px; color: var(--text); background: #10233d; }
 .team-muted { color: var(--muted); font-size: 11px; }
 .text-danger { border: 0; background: transparent; color: #ff9a9a; cursor: pointer; font: inherit; font-size: 11px; }
 .danger-submit { min-height: 44px; border: 1px solid rgba(255,120,120,.35); border-radius: 10px; color: #ffd1d1; background: rgba(150,35,50,.24); cursor: pointer; }
