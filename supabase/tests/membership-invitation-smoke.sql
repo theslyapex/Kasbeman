@@ -341,6 +341,58 @@ WHERE business_id = :'business_id'::uuid
   AND user_id = '10000000-0000-4000-8000-000000000005'
   AND status = 'active';
 
+-- A suspended user can regain access only through a fresh invitation accepted
+-- by the same verified account; old role assignments are not restored directly.
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
+
+UPDATE public.business_members
+SET status = 'suspended'
+WHERE business_id = :'business_id'::uuid
+  AND user_id = '10000000-0000-4000-8000-000000000005'
+  AND status = 'active';
+
+SELECT invitation_id AS reactivation_invite_id, invitation_token AS reactivation_invite_token
+FROM public.create_business_invitation(
+  :'business_id'::uuid, 'invitee@kasbeman.test', 'member'
+) \\gset
+SELECT set_config('kasbeman.test_reactivation_token', :'reactivation_invite_token', false);
+
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000005';
+
+SELECT public.accept_business_invitation(
+  current_setting('kasbeman.test_reactivation_token')
+) AS reactivated_business_id \\gset
+
+DO $reactivation_check$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.business_members
+    WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
+      AND user_id = auth.uid()
+      AND status = 'active'
+      AND role_key = 'member'
+  ) THEN
+    RAISE EXCEPTION 'Fresh invitation did not reactivate the suspended membership';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.member_role_assignments mra
+    JOIN public.roles r
+      ON r.business_id = mra.business_id AND r.id = mra.role_id
+    WHERE mra.business_id = current_setting('kasbeman.test_business_id')::uuid
+      AND mra.user_id = auth.uid()
+      AND mra.status = 'active'
+      AND r.role_key = 'member'
+  ) THEN
+    RAISE EXCEPTION 'Fresh invitation did not create a new active role assignment';
+  END IF;
+END
+$reactivation_check$;
 
 -- Only the current sole owner may transfer ownership, and the target must be
 -- an already-active member. The transfer is atomic across membership + RBAC.
