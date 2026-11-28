@@ -28,7 +28,7 @@ VALUES
   (:'business_id'::uuid, :'custom_role_id'::uuid, 'dashboard.read'),
   (:'business_id'::uuid, :'custom_role_id'::uuid, 'sales.orders.read');
 
-DO $
+DO $custom_role_test$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.roles
@@ -59,14 +59,14 @@ BEGIN
     RAISE EXCEPTION 'System owner role was modified';
   END IF;
 END
-$;
+$custom_role_test$;
 
 -- A regular member cannot create roles or edit permission grants.
 RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
 
-DO $
+DO $custom_role_test$
 BEGIN
   BEGIN
     INSERT INTO public.roles (
@@ -79,7 +79,7 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
 END
-$;
+$custom_role_test$;
 
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
