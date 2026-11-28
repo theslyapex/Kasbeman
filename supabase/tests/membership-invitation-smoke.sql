@@ -20,7 +20,7 @@ INSERT INTO public.roles (
 ) VALUES (
   :'business_id'::uuid, 'custom_sales_ops', 'کارشناس فروش',
   'دسترسی محدود عملیات فروش', false, auth.uid()
-) RETURNING id AS custom_role_id \\gset
+) RETURNING id AS custom_role_id \gset
 SELECT set_config('kasbeman.test_custom_role_id', :'custom_role_id', false);
 
 INSERT INTO public.role_permissions (business_id, role_id, permission_key)
