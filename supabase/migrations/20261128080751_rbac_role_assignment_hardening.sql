@@ -1,6 +1,6 @@
 -- Kasbeman RBAC role-assignment privilege hardening.
 -- Generated migration scaffold with Supabase CLI v3.4.0.
--- Depends on 20261127083000_rbac_authorization_foundation.sql.
+-- Depends on 20261127085000_rbac_authorization_foundation.sql.
 -- Review candidate only: do not apply to hosted Supabase without separate approval.
 
 begin;
