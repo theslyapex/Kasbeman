@@ -220,7 +220,7 @@ begin
     pg_catalog.encode(extensions.digest(v_token, 'sha256'), 'hex'),
     p_expires_at
   )
-  returning id, public.business_invitations.expires_at
+  returning id, expires_at
   into invitation_id, expires_at;
 
   invitation_token := v_token;
