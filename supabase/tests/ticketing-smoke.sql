@@ -80,6 +80,10 @@ BEGIN
  IF (SELECT count(*) FROM public.ticket_comments WHERE ticket_id=v_primary) <> 1 THEN
    RAISE EXCEPTION 'Internal ticket note leaked to a user without internal-read permission';
  END IF;
+ IF (SELECT count(*) FROM public.ticket_events
+     WHERE ticket_id=v_primary AND event_type='comment_added') <> 1 THEN
+   RAISE EXCEPTION 'Internal-note activity metadata leaked to a user without internal-read permission';
+ END IF;
 END
 $ticket_branch_scope$;
 
@@ -229,6 +233,14 @@ BEGIN
  IF NOT EXISTS (SELECT 1 FROM public.ticket_events WHERE ticket_id=v_ticket AND event_type='archived') THEN
    RAISE EXCEPTION 'Ticket archive event was not recorded';
  END IF;
+ IF (SELECT count(*) FROM public.ticket_events
+     WHERE ticket_id=v_ticket AND event_type='comment_added') <> 2 THEN
+   RAISE EXCEPTION 'Owner cannot see the full public and internal comment audit trail';
+ END IF;
+ IF EXISTS (SELECT 1 FROM public.ticket_events
+     WHERE ticket_id=v_ticket AND event_type='comment_added' AND payload ? 'body') THEN
+   RAISE EXCEPTION 'Comment body was copied into the event audit payload';
+ END IF;
 END
 $ticket_event_integrity$;
 
@@ -280,6 +292,7 @@ BEGIN
  FOREACH v_function IN ARRAY ARRAY[
    'private.guard_ticket_changes()',
    'private.record_ticket_event()',
+   'private.record_ticket_comment_event()',
    'private.ticket_event_append_only()'
  ] LOOP
    IF has_function_privilege('anon',v_function,'EXECUTE') OR
