@@ -256,11 +256,20 @@ class _TicketsScreenState extends State<TicketsScreen> {
       const Divider(height:28),Text('تاریخچه',style:Theme.of(context).textTheme.titleSmall),
       ..._events.take(10).map((e)=>Padding(padding:const EdgeInsets.only(top:8),child:Row(children:[
         const Icon(Icons.history,size:15,color:Colors.white54),const SizedBox(width:8),
-        Expanded(child:Text(e['event_type'] as String,style:const TextStyle(color:Colors.white70,fontSize:12))),
+        Expanded(child:Text(_eventLabel(e['event_type'] as String),style:const TextStyle(color:Colors.white70,fontSize:12))),
         Text(_date(e['created_at'] as String),style:const TextStyle(color:Colors.white38,fontSize:10)),
       ]))),
     ])));
   }
+  String _eventLabel(String type) => const {
+    'created':'تیکت ثبت شد',
+    'status_changed':'وضعیت تغییر کرد',
+    'assignee_changed':'مسئول تغییر کرد',
+    'archived':'تیکت بایگانی شد',
+    'comment_added':'پیام جدید ثبت شد',
+    'content_updated':'محتوای تیکت ویرایش شد',
+  }[type] ?? 'به‌روزرسانی تیکت';
+
   String _date(String s) {
     final d=DateTime.tryParse(s)?.toLocal(); if(d==null)return '';
     return d.year.toString()+'/'+d.month.toString().padLeft(2,'0')+'/'+d.day.toString().padLeft(2,'0');
