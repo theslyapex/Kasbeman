@@ -102,7 +102,8 @@ SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 UPDATE public.member_role_assignments SET status='revoked', revoked_at=now()
 WHERE business_id=:'business_id'::uuid
   AND user_id='10000000-0000-4000-8000-000000000002'
-  AND role_id=:'crm_reader_role_id'::uuid AND status='active';
+  AND role_id IN (:'crm_reader_role_id'::uuid, :'customer_reader_role_id'::uuid)
+  AND status='active';
 RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
@@ -115,7 +116,7 @@ DO $crm_creator_scope$
 BEGIN
  IF EXISTS (
    SELECT 1 FROM public.customers
-   WHERE id=current_setting('kasbeman.test_crm_created_customer_id')::uuid
+   WHERE name='مشتری ایجادشده توسط نقش محدود'
  ) THEN
    RAISE EXCEPTION 'Create-only CRM role unexpectedly has read access';
  END IF;
