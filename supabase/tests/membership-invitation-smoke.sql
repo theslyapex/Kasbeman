@@ -823,12 +823,28 @@ VALUES (
 ) RETURNING id AS branch_scope_other_id \gset
 SELECT set_config('kasbeman.test_branch_scope_other_id', :'branch_scope_other_id', false);
 
+INSERT INTO public.roles (
+  business_id, role_key, name, description, is_system, created_by
+) VALUES (
+  current_setting('kasbeman.test_business_id')::uuid,
+  'custom_branch_scope_test', 'Branch Scope Test',
+  'Test-only branch-scoped permission', false, auth.uid()
+) RETURNING id AS branch_scope_role_id \\gset
+SELECT set_config('kasbeman.test_branch_scope_role_id', :'branch_scope_role_id', false);
+
+INSERT INTO public.role_permissions (business_id, role_id, permission_key)
+VALUES (
+  current_setting('kasbeman.test_business_id')::uuid,
+  current_setting('kasbeman.test_branch_scope_role_id')::uuid,
+  'sales.orders.manage'
+);
+
 INSERT INTO public.member_role_assignments (
   business_id, user_id, role_id, branch_id, status, assigned_by
 ) VALUES (
   current_setting('kasbeman.test_business_id')::uuid,
   '10000000-0000-4000-8000-000000000005'::uuid,
-  current_setting('kasbeman.test_custom_role_id')::uuid,
+  current_setting('kasbeman.test_branch_scope_role_id')::uuid,
   current_setting('kasbeman.test_branch_scope_primary_id')::uuid,
   'active', auth.uid()
 );
@@ -843,13 +859,13 @@ DECLARE
   v_primary_branch_id uuid := current_setting('kasbeman.test_branch_scope_primary_id')::uuid;
   v_other_branch_id uuid := current_setting('kasbeman.test_branch_scope_other_id')::uuid;
 BEGIN
-  IF NOT private.has_business_permission(v_business_id, 'sales.orders.read', v_primary_branch_id) THEN
+  IF NOT private.has_business_permission(v_business_id, 'sales.orders.manage', v_primary_branch_id) THEN
     RAISE EXCEPTION 'Branch-scoped role did not grant permission in its assigned branch';
   END IF;
-  IF private.has_business_permission(v_business_id, 'sales.orders.read', NULL) THEN
+  IF private.has_business_permission(v_business_id, 'sales.orders.manage', NULL) THEN
     RAISE EXCEPTION 'Branch-scoped role leaked permission to the whole business';
   END IF;
-  IF private.has_business_permission(v_business_id, 'sales.orders.read', v_other_branch_id) THEN
+  IF private.has_business_permission(v_business_id, 'sales.orders.manage', v_other_branch_id) THEN
     RAISE EXCEPTION 'Branch-scoped role leaked permission into another branch';
   END IF;
 END
