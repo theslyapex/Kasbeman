@@ -76,7 +76,6 @@ export default async function BusinessCustomersPage({
         canCreate={canCreate && !missingSchema}
         canEdit={canEdit}
         canArchive={canArchive}
-        schemaReady={!missingSchema}
       />
     </main>
   );
