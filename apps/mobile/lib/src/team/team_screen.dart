@@ -23,7 +23,6 @@ class _TeamScreenState extends State<TeamScreen> {
   List<Map<String, dynamic>> _customRoles = [];
   List<Map<String, dynamic>> _roleAssignments = [];
   List<Map<String, dynamic>> _branches = [];
-  Map<String, String> _permissionLabels = {};
 
   String get _businessId => widget.membership.businessId;
   bool get _canInvite => widget.permissions.contains('team.members.invite');
@@ -99,7 +98,6 @@ class _TeamScreenState extends State<TeamScreen> {
         _members = List<Map<String, dynamic>>.from(members);
         _invitations = List<Map<String, dynamic>>.from(invitations);
         _customRoles = List<Map<String, dynamic>>.from(enrichedRoles);
-        _permissionLabels = labelsByKey;
         _roleAssignments = List<Map<String, dynamic>>.from(roleAssignments);
         _branches = List<Map<String, dynamic>>.from(branches);
         _loading = false;
