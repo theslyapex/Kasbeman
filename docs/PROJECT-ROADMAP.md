@@ -167,4 +167,4 @@
 - دسترسی مورد انتظار نقش `authenticated` برای RPCهای کسب‌وکار و توابع کمکی مجوزسنجی کنترل می‌شود.
 - توابع داخلی trigger نباید مستقیماً توسط نقش‌های API اجرا شوند.
 - سناریوی منفی تأیید فروش با نقش فاقد `sales.invoices.manage` نیز به آزمون یکپارچه اضافه شد.
-- این بررسی‌ها فقط در PostgreSQL موقت CI اجرا می‌شوند؛ هیچ SQL یا migration روی Supabase تولید اجرا نشده است. نتیجه نهایی پس از تکمیل CI ثبت می‌شود.
+- تمام مراحل CI برای commit `3b3fa994bdda5d5193ef0df9c37813d5da13cd0b` موفق شدند: بررسی SQL، ساختار امنیتی، آزمون PostgreSQL 17 و جداسازی tenant، آزمون هم‌زمانی چند اتصال، vinext، TypeScript، ESLint و build تولیدی وب ([اجرای CI](https://github.com/theslyapex/Kasbeman/actions/runs/46089619332)).
