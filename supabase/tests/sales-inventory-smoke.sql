@@ -53,7 +53,8 @@ DECLARE
     'public.reverse_customer_receipt(uuid,text)',
     'public.create_business_invitation(uuid,text,text,timestamptz)',
     'public.revoke_business_invitation(uuid,uuid)',
-    'public.accept_business_invitation(text)'
+    'public.accept_business_invitation(text)',
+    'public.transfer_business_ownership(uuid,uuid)'
   ];
   v_authenticated_helpers text[] := ARRAY[
     'private.has_business_permission(uuid,text,uuid)',
