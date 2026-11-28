@@ -214,3 +214,14 @@
 - آزمون رد انتقال مالکیت به خود و رد انتقال در صورت وجود تخصیص فعال اضافی نقش مالک اضافه شد.
 - CI کامل برای commit `7b06f86d64303549c7d1d762d74aa84cca6fdf57` موفق شد: بررسی delimiterهای SQL، ساختار امنیتی، آزمون PostgreSQL 17 و جداسازی tenant، آزمون چنداتصالی concurrency، بررسی سازگاری vinext، TypeScript، ESLint و build تولیدی وب ([اجرای CI](https://github.com/theslyapex/Kasbeman/actions/runs/46123878024)).
 - این موفقیت مربوط به محیط موقت CI است؛ migration هنوز در پروژه Supabase تولید اجرا نشده است. ساخت migration استاندارد با CLI و بازبینی نهایی آن همچنان باقی است. هیچ SQL روی دیتابیس تولید اجرا نشده و شاخه `main` تغییری نکرده است.
+
+
+## Migrationهای امنیتی عضویت و انتقال مالکیت (۲۰۲۶-۱۱-۲۸)
+
+- با Supabase CLI نسخه 3.4.0 و اجرای واقعی `supabase init` و `supabase migration new` دو migration استاندارد ایجاد شد؛ پیکربندی محلی `supabase/config.jsonc` نیز تولید شد.
+- migration اول: `20261128080751_rbac_role_assignment_hardening.sql`؛ واگذاری نقش فقط وقتی مجاز است که واگذارکننده تمام مجوزهای نقش مقصد را در همان محدوده داشته باشد.
+- migration دوم: `20261128080753_membership_invitation_ownership_hardening.sql`؛ چرخه تعلیق/لغو عضویت، دعوت امن با توکن هش‌شده، پذیرش یک‌باره دعوت و انتقال اتمیک مالکیت را پوشش می‌دهد.
+- کنترل مالکیت اکنون هم تخصیص RBAC و هم `business_members.role_key` را تطبیق می‌دهد؛ وجود مالک اضافی، وضعیت قدیمی ناسازگار یا نقش مالک محدود به شعبه، انتقال را متوقف می‌کند.
+- `scripts/test-postgres-schema.sh` اکنون خود migrationهای canonical را اجرا می‌کند، نه نسخه‌های draft؛ آزمون‌ها تخصیص اضافی مالک، نقش قدیمی ناسازگار و نقش مالک شعبه‌ای را هم پوشش می‌دهند.
+- اجرای CI برای commit `45dd085d37f66979273d2b56bd86bde4024446b6` موفق شد: delimiterهای SQL، بررسی ساختار امنیتی، آزمون PostgreSQL 17 و جداسازی tenant، آزمون concurrency چنداتصالی، vinext، TypeScript، ESLint و build تولیدی وب ([اجرای موفق CI](https://github.com/theslyapex/Kasbeman/actions/runs/46124620129)).
+- این migrationها فقط در محیط موقت CI اجرا شده‌اند؛ هیچ migration یا SQL روی Supabase تولید اجرا نشده و شاخه `main` بدون تغییر است. اعمال روی پروژه اصلی نیازمند تأیید جداگانه است.

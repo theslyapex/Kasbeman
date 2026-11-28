@@ -1,7 +1,7 @@
--- Kasbeman RBAC role-assignment privilege hardening — REVIEW DRAFT
--- Follow-up to the already-applied 20261127085000 RBAC foundation.
--- This file is applied only to disposable PostgreSQL CI by test-postgres-schema.sh.
--- Do not apply to production without explicit approval and a generated migration.
+-- REVIEW REFERENCE COPY — canonical migration:
+-- supabase/migrations/20261128080751_rbac_role_assignment_hardening.sql
+-- CI applies the canonical migration, not this duplicate reference copy.
+-- Keep this file synchronized only while the migration remains under review.
 
 begin;
 

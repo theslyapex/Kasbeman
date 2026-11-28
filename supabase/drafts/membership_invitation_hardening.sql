@@ -1,6 +1,7 @@
--- Kasbeman membership lifecycle and invitation hardening — REVIEW DRAFT
--- Applies only to disposable PostgreSQL CI. Production migrations remain untouched.
--- Requires identity/tenancy + RBAC foundation and role-assignment hardening.
+-- REVIEW REFERENCE COPY — canonical migration:
+-- supabase/migrations/20261128080753_membership_invitation_ownership_hardening.sql
+-- CI applies the canonical migration, not this duplicate reference copy.
+-- Depends on identity/tenancy, RBAC foundation, and the preceding role-assignment hardening migration.
 
 begin;
 
