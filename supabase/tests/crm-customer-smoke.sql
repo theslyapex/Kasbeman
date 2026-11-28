@@ -10,14 +10,14 @@ SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 INSERT INTO public.roles (business_id, role_key, name, description, is_system, created_by)
 VALUES (:'business_id'::uuid, 'crm-smoke-reader', 'CRM Reader',
         'Read-only CRM access', false, auth.uid())
-RETURNING id AS crm_reader_role_id \gset;
+RETURNING id AS crm_reader_role_id \gset
 INSERT INTO public.role_permissions (business_id, role_id, permission_key)
 VALUES (:'business_id'::uuid, :'crm_reader_role_id'::uuid, 'crm.customers.read');
 
 INSERT INTO public.roles (business_id, role_key, name, description, is_system, created_by)
 VALUES (:'business_id'::uuid, 'crm-smoke-editor', 'CRM Editor',
         'May edit customer profile, but not archive', false, auth.uid())
-RETURNING id AS crm_editor_role_id \gset;
+RETURNING id AS crm_editor_role_id \gset
 INSERT INTO public.role_permissions (business_id, role_id, permission_key)
 VALUES
  (:'business_id'::uuid, :'crm_editor_role_id'::uuid, 'crm.customers.read'),
@@ -26,7 +26,7 @@ VALUES
 INSERT INTO public.roles (business_id, role_key, name, description, is_system, created_by)
 VALUES (:'business_id'::uuid, 'crm-smoke-creator', 'CRM Creator',
         'May create customer records', false, auth.uid())
-RETURNING id AS crm_creator_role_id \gset;
+RETURNING id AS crm_creator_role_id \gset
 INSERT INTO public.role_permissions (business_id, role_id, permission_key)
 VALUES (:'business_id'::uuid, :'crm_creator_role_id'::uuid, 'crm.customers.create');
 
@@ -98,20 +98,24 @@ $crm_editor_archive_guard$;
 -- Creator can insert but is not granted customer read or update privileges.
 RESET ROLE;
 SET ROLE authenticated;
-SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 UPDATE public.member_role_assignments SET status='revoked', revoked_at=now()
-WHERE business_id=:'business_id'::uuid AND user_id=auth.uid()
+WHERE business_id=:'business_id'::uuid
+  AND user_id='10000000-0000-4000-8000-000000000002'
   AND role_id=:'crm_reader_role_id'::uuid AND status='active';
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
 INSERT INTO public.customers (business_id, name, created_by)
 VALUES (current_setting('kasbeman.test_business_id')::uuid,
         'مشتری ایجادشده توسط نقش محدود', auth.uid())
-RETURNING id AS crm_created_customer_id \gset;
+RETURNING id AS crm_created_customer_id \gset
 
 DO $crm_creator_scope$
 BEGIN
  IF EXISTS (
    SELECT 1 FROM public.customers
-   WHERE id=:'crm_created_customer_id'::uuid
+   WHERE id=current_setting('kasbeman.test_crm_created_customer_id')::uuid
  ) THEN
    RAISE EXCEPTION 'Create-only CRM role unexpectedly has read access';
  END IF;
@@ -119,8 +123,6 @@ END
 $crm_creator_scope$;
 
 -- A user from another tenant cannot read this tenant's customer.
-RESET ROLE;
-SET ROLE authenticated;
 RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000003';
