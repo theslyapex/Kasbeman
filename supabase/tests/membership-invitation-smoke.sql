@@ -320,6 +320,16 @@ BEGIN
     RAISE EXCEPTION 'Business member lifecycle guard trigger is missing or disabled';
   END IF;
 
+  RAISE NOTICE 'Lifecycle trigger definition: %',
+    (SELECT pg_get_triggerdef(t.oid) FROM pg_trigger t
+     WHERE t.tgrelid = 'public.business_members'::regclass
+       AND t.tgname = 'business_member_lifecycle_guard');
+  RAISE NOTICE 'Target membership before update: %',
+    (SELECT jsonb_build_object('status', bm.status, 'role_key', bm.role_key)
+     FROM public.business_members bm
+     WHERE bm.business_id = current_setting('kasbeman.test_business_id')::uuid
+       AND bm.user_id = '10000000-0000-4000-8000-000000000002');
+
   BEGIN
     UPDATE public.business_members
     SET status = 'suspended'
