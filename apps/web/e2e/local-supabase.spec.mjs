@@ -48,6 +48,7 @@ test("web signup, workspace, CRM customer and ticket flow against local Supabase
   await page.getByRole("button", { name: "+ تیکت جدید" }).click();
   await page.getByLabel("عنوان").fill(ticketTitle);
   await page.getByLabel("شرح درخواست").fill("آزمون انتها به انتهای ثبت و پیگیری درخواست");
+  await page.getByLabel("مشتری (اختیاری)").selectOption({ label: customerName });
   await page.getByRole("button", { name: "ثبت تیکت" }).click();
   await expect(page.getByRole("heading", { name: ticketTitle })).toBeVisible();
 
