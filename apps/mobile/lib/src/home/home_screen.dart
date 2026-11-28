@@ -5,6 +5,7 @@ import '../inventory/inventory_screen.dart';
 import '../team/team_screen.dart';
 import '../workspace/branch_selection_store.dart';
 import '../workspace/create_branch_screen.dart';
+import '../workspace/manage_branches_screen.dart';
 import '../workspace/workspace_repository.dart';
 
 const _inventoryModuleEnabled = bool.fromEnvironment(
@@ -157,6 +158,22 @@ class _HomeScreenState extends State<HomeScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('شعبه با موفقیت ایجاد شد.')),
     );
+  }
+
+  Future<void> _manageBranches() async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => ManageBranchesScreen(
+          businessId: widget.membership.businessId,
+          repository: widget.repository,
+        ),
+      ),
+    );
+    if (changed != true || !mounted) return;
+    setState(() {
+      _selectedBranchId = null;
+      _branchesFuture = _loadBranches();
+    });
   }
 
   Future<void> _signOut(BuildContext context) async {
@@ -326,6 +343,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                       onPressed: _createBranch,
                                       icon: const Icon(Icons.add_business),
                                       label: const Text('افزودن شعبه'),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    OutlinedButton.icon(
+                                      onPressed: _manageBranches,
+                                      icon: const Icon(Icons.settings_outlined),
+                                      label: const Text('مدیریت شعب'),
                                     ),
                                   ],
                                   const SizedBox(height: 14),
