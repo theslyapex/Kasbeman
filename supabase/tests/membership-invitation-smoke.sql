@@ -771,6 +771,7 @@ VALUES (
   :'privileged_role_id'::uuid,
   'business.delete'
 );
+SELECT set_config('kasbeman.test_privileged_role_id', :'privileged_role_id', false);
 
 RESET ROLE;
 SET ROLE authenticated;
@@ -779,7 +780,7 @@ SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 DO $role_assignment_escalation_test$
 DECLARE
   v_business_id uuid := current_setting('kasbeman.test_business_id')::uuid;
-  v_privileged_role_id uuid := :'privileged_role_id'::uuid;
+  v_privileged_role_id uuid := current_setting('kasbeman.test_privileged_role_id')::uuid;
 BEGIN
   IF NOT private.has_business_permission(v_business_id, 'team.roles.assign', null) THEN
     RAISE EXCEPTION 'Former owner admin should retain team.roles.assign for this test';
