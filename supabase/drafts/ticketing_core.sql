@@ -66,7 +66,7 @@ create index tickets_business_assignee_idx on public.tickets(business_id,assigne
 create index tickets_customer_idx on public.tickets(business_id,customer_id,created_at desc) where customer_id is not null;
 
 create or replace function private.guard_ticket_changes()
-returns trigger language plpgsql set search_path=''
+returns trigger language plpgsql security definer set search_path=''
 as $ticket_guard$
 begin
  if tg_op='INSERT' then
