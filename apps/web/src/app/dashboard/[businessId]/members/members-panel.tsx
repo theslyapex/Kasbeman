@@ -34,6 +34,7 @@ export function MembersPanel({
   assignableRoles,
   branches,
   canManageBranches,
+  canReadBranches,
   canAssignRoles,
   canInvite,
   canTransfer,
@@ -47,6 +48,7 @@ export function MembersPanel({
   assignableRoles: AssignableRole[];
   branches: BranchOption[];
   canManageBranches: boolean;
+  canReadBranches: boolean;
   canAssignRoles: boolean;
   canInvite: boolean;
   canTransfer: boolean;
@@ -189,7 +191,7 @@ export function MembersPanel({
         </div>
       </section>
 
-      {(canManageBranches || branches.length > 0) ? (
+      {(canManageBranches || canReadBranches) ? (
         <BranchesPanel
           businessId={businessId}
           branches={branches}
