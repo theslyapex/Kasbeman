@@ -224,7 +224,6 @@ export async function updateBranchAction(input: {
       name: parsed.data.name,
       code: normalizedCode || null,
       status: parsed.data.status,
-      updated_at: new Date().toISOString(),
     })
     .eq("business_id", parsed.data.businessId)
     .eq("id", parsed.data.branchId)
