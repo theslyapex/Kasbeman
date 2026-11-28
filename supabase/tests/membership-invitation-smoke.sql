@@ -10,6 +10,77 @@ UPDATE auth.users
 SET email = 'other@kasbeman.test', email_confirmed_at = now()
 WHERE id = '10000000-0000-4000-8000-000000000006';
 
+-- Custom role definitions and permission grants are tenant-scoped and guarded by RBAC.
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
+
+INSERT INTO public.roles (
+  business_id, role_key, name, description, is_system, created_by
+) VALUES (
+  :'business_id'::uuid, 'custom_sales_ops', 'کارشناس فروش',
+  'دسترسی محدود عملیات فروش', false, auth.uid()
+) RETURNING id AS custom_role_id \\gset
+SELECT set_config('kasbeman.test_custom_role_id', :'custom_role_id', false);
+
+INSERT INTO public.role_permissions (business_id, role_id, permission_key)
+VALUES
+  (:'business_id'::uuid, :'custom_role_id'::uuid, 'dashboard.read'),
+  (:'business_id'::uuid, :'custom_role_id'::uuid, 'sales.orders.read');
+
+DO $
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.roles
+    WHERE id = current_setting('kasbeman.test_custom_role_id')::uuid
+      AND business_id = current_setting('kasbeman.test_business_id')::uuid
+      AND is_system = false
+      AND status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'Authorized owner could not create a custom role';
+  END IF;
+  IF (
+    SELECT count(*) FROM public.role_permissions
+    WHERE role_id = current_setting('kasbeman.test_custom_role_id')::uuid
+  ) <> 2 THEN
+    RAISE EXCEPTION 'Custom role permission grants were not persisted';
+  END IF;
+
+  UPDATE public.roles SET name = 'کارشناس فروش ارشد'
+  WHERE id = current_setting('kasbeman.test_custom_role_id')::uuid;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Authorized owner could not update a custom role';
+  END IF;
+
+  UPDATE public.roles SET name = 'مالک جعلی'
+  WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
+    AND role_key = 'owner';
+  IF FOUND THEN
+    RAISE EXCEPTION 'System owner role was modified';
+  END IF;
+END
+$;
+
+-- A regular member cannot create roles or edit permission grants.
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
+
+DO $
+BEGIN
+  BEGIN
+    INSERT INTO public.roles (
+      business_id, role_key, name, is_system, created_by
+    ) VALUES (
+      current_setting('kasbeman.test_business_id')::uuid,
+      'forged_role', 'نقش جعلی', false, auth.uid()
+    );
+    RAISE EXCEPTION 'Member without team.roles.manage created a custom role';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+END
+$;
+
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 
