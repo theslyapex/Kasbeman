@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../inventory/inventory_screen.dart';
 import '../team/team_screen.dart';
+import '../tickets/tickets_screen.dart';
 import '../workspace/branch_selection_store.dart';
 import '../workspace/create_branch_screen.dart';
 import '../workspace/manage_branches_screen.dart';
@@ -385,6 +386,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                           color: Colors.white54,
                                           fontSize: 12,
                                         ),
+                                      ),
+                                    ),
+                                  if (result.permissions.contains('tickets.read') ||
+                                      result.permissions.contains('tickets.create'))
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 10),
+                                      child: FilledButton.icon(
+                                        onPressed: () => Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) => TicketsScreen(
+                                              membership: widget.membership,
+                                              branchId: selected.id,
+                                              permissions: result.permissions,
+                                            ),
+                                          ),
+                                        ),
+                                        icon: const Icon(Icons.support_agent_outlined),
+                                        label: const Text('مرکز تیکت‌ها'),
                                       ),
                                     ),
                                 ],
