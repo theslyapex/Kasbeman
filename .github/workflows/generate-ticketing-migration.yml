@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ticketing-migration-\${{ github.ref }}
+  group: ticketing-migration-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
       - name: Checkout development branch
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.ref_name }}
+          ref: ${{ github.ref_name }}
 
       - name: Install pinned Supabase CLI
         uses: supabase/setup-cli@v1
@@ -58,7 +58,7 @@ jobs:
         if: steps.migration.outputs.path != ''
         shell: bash
         env:
-          MIGRATION_PATH: \${{ steps.migration.outputs.path }}
+          MIGRATION_PATH: ${{ steps.migration.outputs.path }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -69,4 +69,4 @@ jobs:
             exit 0
           fi
           git commit -m "db(tickets): generate canonical ticketing migration"
-          git push origin "HEAD:\${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
