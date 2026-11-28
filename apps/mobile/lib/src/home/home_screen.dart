@@ -382,6 +382,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           permissions.contains('team.members.manage') ||
                           permissions.contains('team.members.invite') ||
                           permissions.contains('team.roles.manage') ||
+                          permissions.contains('team.roles.assign') ||
                           permissions.contains('business.ownership.transfer');
                       if (!teamSnapshot.hasData || !canOpenTeam) {
                         return const SizedBox.shrink();
