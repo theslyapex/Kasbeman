@@ -109,9 +109,13 @@ export default async function BusinessMembersPage({
     roleName: roleNameById.get(assignment.role_id) ?? "نقش نامشخص",
     branchName: assignment.branch_id ? branchNameById.get(assignment.branch_id) ?? "شعبه" : null,
   }));
+  const permissionLabelByKey = new Map((permissionCatalogue ?? []).map((permission) => [permission.permission_key, permission.label_fa]));
   const assignableRoles = roles
     .filter((role) => !role.is_system && role.status === "active")
-    .map(({ id, name, description }) => ({ id, name, description }));
+    .map(({ id, name, description, permissionKeys }) => ({
+      id, name, description,
+      permissionLabels: permissionKeys.map((key) => permissionLabelByKey.get(key) ?? key),
+    }));
 
   return (
     <main className="dashboard-shell">
