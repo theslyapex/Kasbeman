@@ -870,4 +870,48 @@ BEGIN
   END IF;
 END
 $branch_role_scope_test$;
+-- Branch management: create, edit, deactivate, and reactivate a non-primary branch.
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000004';
+
+INSERT INTO public.branches (
+  business_id, name, code, is_primary, status
+) VALUES (
+  current_setting('kasbeman.test_business_id')::uuid,
+  'شعبه چرخه مدیریت', 'CI-BRANCH-LIFECYCLE', false, 'active'
+) RETURNING id AS branch_management_test_id \gset
+SELECT set_config('kasbeman.test_branch_management_id', :'branch_management_test_id', false);
+
+UPDATE public.branches
+SET name = 'شعبه ویرایش‌شده',
+    code = 'CI-BRANCH-UPDATED',
+    status = 'inactive',
+    updated_at = now()
+WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
+  AND id = current_setting('kasbeman.test_branch_management_id')::uuid;
+
+DO $branch_management_test$
+DECLARE
+  v_branch record;
+BEGIN
+  SELECT name, code, status, is_primary
+  INTO v_branch
+  FROM public.branches
+  WHERE id = current_setting('kasbeman.test_branch_management_id')::uuid;
+
+  IF v_branch.name <> 'شعبه ویرایش‌شده'
+     OR v_branch.code <> 'CI-BRANCH-UPDATED'
+     OR v_branch.status <> 'inactive'
+     OR v_branch.is_primary THEN
+    RAISE EXCEPTION 'Branch edit/deactivation did not persist the expected values';
+  END IF;
+END
+$branch_management_test$;
+
+UPDATE public.branches
+SET status = 'active', updated_at = now()
+WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
+  AND id = current_setting('kasbeman.test_branch_management_id')::uuid;
+
 SELECT 'Membership lifecycle and invitation hardening checks passed.' AS result;
