@@ -11,7 +11,7 @@ psql -v ON_ERROR_STOP=1 \
   -f supabase/migrations/20261128100000_add_missing_fk_indexes.sql \
   -f supabase/migrations/20261128124155_crm_customer_core.sql \
   -f supabase/drafts/sales_inventory_core.sql \
-  -f supabase/drafts/ticketing_core.sql \
+  -f supabase/migrations/20261128124535_ticketing_core.sql \
   -f supabase/tests/sales-inventory-smoke.sql \
   -f supabase/tests/crm-customer-smoke.sql \
   -f supabase/tests/ticketing-smoke.sql \
