@@ -225,3 +225,12 @@
 - `scripts/test-postgres-schema.sh` اکنون خود migrationهای canonical را اجرا می‌کند، نه نسخه‌های draft؛ آزمون‌ها تخصیص اضافی مالک، نقش قدیمی ناسازگار و نقش مالک شعبه‌ای را هم پوشش می‌دهند.
 - اجرای CI برای commit `45dd085d37f66979273d2b56bd86bde4024446b6` موفق شد: delimiterهای SQL، بررسی ساختار امنیتی، آزمون PostgreSQL 17 و جداسازی tenant، آزمون concurrency چنداتصالی، vinext، TypeScript، ESLint و build تولیدی وب ([اجرای موفق CI](https://github.com/theslyapex/Kasbeman/actions/runs/46124620129)).
 - این migrationها فقط در محیط موقت CI اجرا شده‌اند؛ هیچ migration یا SQL روی Supabase تولید اجرا نشده و شاخه `main` بدون تغییر است. اعمال روی پروژه اصلی نیازمند تأیید جداگانه است.
+
+
+## تکمیل محافظت مالک قدیمی و هم‌ترازی تاریخچه Migration (۲۰۲۶-۱۱-۲۸)
+
+- نام دو Migration پایه در پوشه canonical با نسخه‌های ثبت‌شده واقعی Supabase هم‌تراز شد: `20261127081007_identity_tenancy_foundation.sql` و `20261127085000_rbac_authorization_foundation.sql`. اسکریپت تست PostgreSQL نیز همین نسخه‌ها را اجرا می‌کند.
+- محافظ چرخه عضویت علاوه بر تخصیص RBAC، مقدار قدیمی `business_members.role_key = 'owner'` را هم محافظت می‌کند؛ مدیر عادی نمی‌تواند چنین عضوی را مدیریت یا تعلیق کند.
+- آزمون این مسیر از عضو فعال دعوت‌شده استفاده می‌کند تا نتیجه به عضوی که در مرحله قبلی تست تعلیق شده وابسته نباشد.
+- اجرای CI برای commit `12e6badf86b7098d23954affdc088f146c809afc` موفق شد؛ شامل آزمون PostgreSQL 17، تست جداسازی tenant و concurrency، بررسی ساختاری SQL، TypeScript، ESLint و build وب ([اجرای موفق CI](https://github.com/theslyapex/Kasbeman/actions/runs/46127447555)).
+- اجرای موفق بالا در محیط موقت CI بوده است. هیچ Migration یا SQL تغییردهنده‌ای روی پروژه Supabase تولید اجرا نشده و شاخه `main` تغییر نکرده است. پیش از هر اجرای تولیدی، بازبینی نهایی و تأیید صریح جداگانه لازم است.
