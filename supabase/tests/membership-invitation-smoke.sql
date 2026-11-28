@@ -393,6 +393,32 @@ BEGIN
     RAISE EXCEPTION 'Previous owner did not receive the admin role';
   END IF;
 
+  IF EXISTS (
+    SELECT 1
+    FROM public.member_role_assignments mra
+    JOIN public.roles r
+      ON r.business_id = mra.business_id AND r.id = mra.role_id
+    WHERE mra.business_id = v_business_id
+      AND mra.user_id = v_new_owner_id
+      AND mra.status = 'active'
+      AND r.role_key <> 'owner'
+  ) THEN
+    RAISE EXCEPTION 'New owner retained stale role assignments';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.member_role_assignments mra
+    JOIN public.roles r
+      ON r.business_id = mra.business_id AND r.id = mra.role_id
+    WHERE mra.business_id = v_business_id
+      AND mra.user_id = v_old_owner_id
+      AND mra.status = 'active'
+      AND r.role_key <> 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Previous owner retained additional role assignments';
+  END IF;
+
   IF private.has_business_permission(v_business_id, 'business.ownership.transfer', null) THEN
     RAISE EXCEPTION 'Previous owner retained ownership transfer permission';
   END IF;
