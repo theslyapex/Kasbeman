@@ -116,6 +116,8 @@ create policy business_invitations_select_authorized
   );
 
 revoke all on table public.business_invitations from anon, authenticated;
+revoke update (email, role_key, status, expires_at)
+  on table public.business_invitations from anon, authenticated;
 grant select (
   id, business_id, email, role_key, status, invited_by,
   expires_at, accepted_at, created_at
@@ -213,14 +215,14 @@ begin
 
   v_token := pg_catalog.encode(extensions.gen_random_bytes(32), 'hex');
 
-  insert into public.business_invitations (
+  insert into public.business_invitations as bi (
     business_id, email, role_key, status, invited_by, token_hash, expires_at
   ) values (
     p_business_id, v_email, p_role_key, 'pending', v_actor_id,
     pg_catalog.encode(extensions.digest(v_token, 'sha256'), 'hex'),
     p_expires_at
   )
-  returning id, expires_at
+  returning bi.id, bi.expires_at
   into invitation_id, expires_at;
 
   invitation_token := v_token;
