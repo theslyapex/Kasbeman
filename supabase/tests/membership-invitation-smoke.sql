@@ -172,7 +172,8 @@ FROM public.create_business_invitation(
 ) \gset
 RESET ROLE;
 UPDATE public.business_invitations
-SET expires_at = now() - interval '1 minute'
+SET created_at = now() - interval '2 minutes',
+    expires_at = now() - interval '1 minute'
 WHERE id = :'expired_invite_id'::uuid;
 SELECT set_config('kasbeman.test_expired_invite_token', :'expired_invite_token', false);
 
@@ -304,7 +305,7 @@ RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 
-DO $$
+DO $
 BEGIN
   BEGIN
     PERFORM public.transfer_business_ownership(
@@ -314,8 +315,51 @@ BEGIN
     RAISE EXCEPTION 'Ownership was transferred to a suspended member';
   EXCEPTION WHEN check_violation THEN NULL;
   END;
+
+  BEGIN
+    PERFORM public.transfer_business_ownership(
+      current_setting('kasbeman.test_business_id')::uuid,
+      auth.uid()
+    );
+    RAISE EXCEPTION 'Owner transferred ownership to themselves';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
 END
-$$;
+$;
+
+-- An extra active owner assignment on another active member must make the
+-- ownership state inconsistent and block transfer. The nested block rolls
+-- back the deliberately injected bad assignment after the expected rejection.
+RESET ROLE;
+DO $
+BEGIN
+  BEGIN
+    INSERT INTO public.member_role_assignments (
+      business_id, user_id, role_id, branch_id, status, assigned_by
+    )
+    SELECT
+      current_setting('kasbeman.test_business_id')::uuid,
+      '10000000-0000-4000-8000-000000000004'::uuid,
+      r.id, null, 'active',
+      '10000000-0000-4000-8000-000000000001'::uuid
+    FROM public.roles r
+    WHERE r.business_id = current_setting('kasbeman.test_business_id')::uuid
+      AND r.role_key = 'owner'
+      AND r.is_system
+      AND r.status = 'active';
+
+    PERFORM public.transfer_business_ownership(
+      current_setting('kasbeman.test_business_id')::uuid,
+      '10000000-0000-4000-8000-000000000004'
+    );
+    RAISE EXCEPTION 'Transfer ignored an additional active owner assignment';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+END
+$;
+
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 
 SELECT public.transfer_business_ownership(
   current_setting('kasbeman.test_business_id')::uuid,
