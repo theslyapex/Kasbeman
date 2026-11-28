@@ -31,7 +31,7 @@ VALUES
 INSERT INTO public.roles (business_id, role_key, name, description, is_system, created_by)
 VALUES (:'business_id'::uuid, 'ticket-blind-assigner', 'تخصیص‌دهنده بدون مشاهده',
         'Assignment permission without ticket read access must not mutate rows', false, auth.uid())
-RETURNING id AS ticket_blind_assigner_role_id \\gset
+RETURNING id AS ticket_blind_assigner_role_id \gset
 INSERT INTO public.role_permissions (business_id, role_id, permission_key)
 VALUES (:'business_id'::uuid, :'ticket_blind_assigner_role_id'::uuid, 'tickets.assign');
 INSERT INTO public.business_members (business_id,user_id,role_key,status)
