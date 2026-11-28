@@ -24,7 +24,7 @@ type MemberRoleAssignment = {
   status: string;
 };
 type AssignableRole = { id: string; name: string; description: string | null; permissionLabels: string[] };
-type BranchOption = { id: string; name: string; is_primary: boolean; status: string; code: string | null };
+type BranchOption = { id: string; name: string; is_primary: boolean; status: "active" | "inactive" | "archived"; code: string | null };
 
 export function MembersPanel({
   businessId,
