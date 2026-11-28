@@ -307,7 +307,7 @@ BEGIN
    FROM public.roles r
    JOIN public.role_permissions rp
      ON rp.business_id=r.business_id AND rp.role_id=r.id
-   WHERE r.business_id=:'ticket_permission_business_id'::uuid
+   WHERE r.business_id=current_setting('kasbeman.test_ticket_permission_business_id')::uuid
      AND r.role_key='owner' AND rp.permission_key='tickets.read'
  ) THEN
    RAISE EXCEPTION 'New tenant owner role did not receive ticket permissions';
@@ -317,7 +317,7 @@ BEGIN
    FROM public.roles r
    JOIN public.role_permissions rp
      ON rp.business_id=r.business_id AND rp.role_id=r.id
-   WHERE r.business_id=:'ticket_permission_business_id'::uuid
+   WHERE r.business_id=current_setting('kasbeman.test_ticket_permission_business_id')::uuid
      AND r.role_key='admin' AND rp.permission_key='tickets.read'
  ) THEN
    RAISE EXCEPTION 'New tenant admin role did not receive ticket permissions';
@@ -327,7 +327,7 @@ BEGIN
    FROM public.roles r
    JOIN public.role_permissions rp
      ON rp.business_id=r.business_id AND rp.role_id=r.id
-   WHERE r.business_id=:'ticket_permission_business_id'::uuid
+   WHERE r.business_id=current_setting('kasbeman.test_ticket_permission_business_id')::uuid
      AND r.role_key='member' AND rp.permission_key='tickets.delete'
  ) THEN
    RAISE EXCEPTION 'Default member role unexpectedly received ticket archive permission';
