@@ -36,6 +36,18 @@ BEGIN
   END IF;
 
   BEGIN
+    INSERT INTO public.business_invitations (
+      business_id, email, role_key, status, invited_by, token_hash, expires_at
+    ) VALUES (
+      current_setting('kasbeman.test_business_id')::uuid,
+      'forged@kasbeman.test', 'member', 'pending',
+      auth.uid(), repeat('a', 64), now() + interval '7 days'
+    );
+    RAISE EXCEPTION 'Direct invitation insert unexpectedly succeeded';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+
+  BEGIN
     UPDATE public.business_invitations
     SET status = 'revoked'
     WHERE id = current_setting('kasbeman.test_invite_id')::uuid;
