@@ -299,6 +299,7 @@ RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000006';
 SELECT public.create_business('کسب‌وکار مجوز تیکت', 'kasbeman-ci-ticket-perms') AS ticket_permission_business_id \gset
+SELECT set_config('kasbeman.test_ticket_permission_business_id', :'ticket_permission_business_id', false);
 
 DO $ticket_default_roles$
 BEGIN
