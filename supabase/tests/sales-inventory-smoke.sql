@@ -50,7 +50,10 @@ DECLARE
     'public.create_sale_draft(uuid,uuid,uuid,text,jsonb,uuid,text,text)',
     'public.confirm_sale(uuid)',
     'public.record_customer_receipt(uuid,numeric,text,uuid,text,text)',
-    'public.reverse_customer_receipt(uuid,text)'
+    'public.reverse_customer_receipt(uuid,text)',
+    'public.create_business_invitation(uuid,text,text,timestamptz)',
+    'public.revoke_business_invitation(uuid,uuid)',
+    'public.accept_business_invitation(text)'
   ];
   v_authenticated_helpers text[] := ARRAY[
     'private.has_business_permission(uuid,text,uuid)',
@@ -60,7 +63,9 @@ DECLARE
   v_internal_trigger_functions text[] := ARRAY[
     'private.create_default_warehouse_for_branch()',
     'private.apply_stock_movement()',
-    'private.log_authorization_change()'
+    'private.log_authorization_change()',
+    'private.guard_business_member_lifecycle()',
+    'private.guard_owner_role_assignment()'
   ];
 BEGIN
   FOREACH v_function IN ARRAY v_public_endpoints LOOP
