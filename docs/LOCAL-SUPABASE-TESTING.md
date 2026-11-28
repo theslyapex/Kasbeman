@@ -32,6 +32,17 @@ The generated local API keys and test account are temporary. They are never uplo
 
 The `Kasbeman Local Supabase CI` workflow runs this same script on relevant changes to the `foundation/**` branch and can also be started manually. It uses only ephemeral GitHub-hosted runner resources and requires no Supabase organization/project secrets.
 
+## Verified run (2026-11-28)
+
+- Commit: `110356d6ad3591b90290c2a34a09294ad20f3f1e`
+- Run: https://github.com/theslyapex/Kasbeman/actions/runs/46147757682
+- Result: **success**.
+- Real local Auth signup and `/auth/v1/user` verification passed.
+- The Auth user trigger created the profile; authenticated PostgREST profile read passed under RLS.
+- Authenticated `create_business` RPC and tenant-scoped business read passed.
+- The canonical migration chain, RLS/RBAC, CRM, ticketing, sales/inventory, membership, FK and multi-connection concurrency suites all passed against local Supabase PostgreSQL 17.
+- The standard web/database CI also passed on the same commit: https://github.com/theslyapex/Kasbeman/actions/runs/46147757621
+
 ## Safety boundary
 
 - This workflow only talks to localhost inside its isolated runner.
