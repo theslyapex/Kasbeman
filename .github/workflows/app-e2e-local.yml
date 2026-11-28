@@ -123,7 +123,7 @@ jobs:
       - name: Run Flutter UI E2E against local Supabase Auth and Data API
         working-directory: apps/mobile
         run: |
-          flutter test test/local_supabase_e2e_test.dart --reporter expanded \
+          flutter test integration_test/local_supabase_e2e_test.dart --reporter expanded \
             --dart-define=SUPABASE_URL="$SUPABASE_E2E_URL" \
             --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_E2E_KEY"
 
