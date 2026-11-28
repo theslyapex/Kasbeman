@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { BranchesPanel } from "./branches-panel";
 import {
   createInvitationAction,
   revokeInvitationAction,
@@ -23,7 +24,7 @@ type MemberRoleAssignment = {
   status: string;
 };
 type AssignableRole = { id: string; name: string; description: string | null };
-type BranchOption = { id: string; name: string; is_primary: boolean };
+type BranchOption = { id: string; name: string; is_primary: boolean; status: string; code: string | null };
 
 export function MembersPanel({
   businessId,
@@ -32,6 +33,7 @@ export function MembersPanel({
   memberAssignments,
   assignableRoles,
   branches,
+  canManageBranches,
   canAssignRoles,
   canInvite,
   canTransfer,
@@ -44,6 +46,7 @@ export function MembersPanel({
   memberAssignments: MemberRoleAssignment[];
   assignableRoles: AssignableRole[];
   branches: BranchOption[];
+  canManageBranches: boolean;
   canAssignRoles: boolean;
   canInvite: boolean;
   canTransfer: boolean;
@@ -143,7 +146,7 @@ export function MembersPanel({
                       onChange={(event) => setSelectedBranchByMember((current) => ({ ...current, [member.user_id]: event.target.value }))}
                     >
                       <option value="">کل کسب‌وکار</option>
-                      {branches.map((branch) => (
+                      {branches.filter((branch) => branch.status === "active").map((branch) => (
                         <option value={branch.id} key={branch.id}>
                           {branch.name}{branch.is_primary ? " · اصلی" : ""}
                         </option>
@@ -185,6 +188,14 @@ export function MembersPanel({
           {members.length === 0 ? <p className="team-muted">عضوی برای نمایش وجود ندارد.</p> : null}
         </div>
       </section>
+
+      {(canManageBranches || branches.length > 0) ? (
+        <BranchesPanel
+          businessId={businessId}
+          branches={branches}
+          canManage={canManageBranches}
+        />
+      ) : null}
 
       <section className="team-card">
         <h2>دعوت‌نامه‌ها</h2>
