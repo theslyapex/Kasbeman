@@ -197,10 +197,11 @@ class _ManageBranchesScreenState extends State<ManageBranchesScreen> {
           .eq('id', branchId)
           .select('id');
       if (rows.isEmpty) {
-        throw const PostgrestException(
-          message: 'Branch update was not authorized.',
-          code: '42501',
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ویرایش شعبه مجاز نبود؛ دسترسی مدیریت شعب را بررسی کن.')),
         );
+        return;
       }
       _changed = true;
       if (!mounted) return;
