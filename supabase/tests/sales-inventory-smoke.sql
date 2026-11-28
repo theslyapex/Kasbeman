@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 
 -- Every application table in the exposed public schema must enforce RLS.
-DO $
+DO $$
 DECLARE
   v_table record;
   v_privilege text;
@@ -38,7 +38,7 @@ BEGIN
     END IF;
   END LOOP;
 END
-$;
+$$;
 
 -- Function ACL regression checks. has_function_privilege() includes inherited
 -- PUBLIC grants, so a true result for anon would catch an accidental PUBLIC EXECUTE.
@@ -255,6 +255,7 @@ VALUES (:'business_id'::uuid, :'target_stock_role_id'::uuid, 'inventory.stock.re
 SELECT id AS admin_role_id
 FROM public.roles
 WHERE business_id = :'business_id'::uuid AND role_key = 'admin' \gset
+SELECT set_config('kasbeman.test_admin_role_id', :'admin_role_id', false);
 
 SELECT set_config('kasbeman.test_business_id', :'business_id', false);
 SELECT set_config('kasbeman.test_branch_id', :'branch_id', false);
@@ -513,7 +514,7 @@ VALUES (
 );
 
 -- The same actor must not be able to delegate the broader system admin role.
-DO $
+DO $$
 BEGIN
   BEGIN
     INSERT INTO public.member_role_assignments
@@ -521,7 +522,7 @@ BEGIN
     VALUES (
       current_setting('kasbeman.test_business_id')::uuid,
       '10000000-0000-4000-8000-000000000004',
-      :'admin_role_id'::uuid,
+      current_setting('kasbeman.test_admin_role_id')::uuid,
       NULL,
       'active',
       auth.uid()
@@ -530,9 +531,9 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
 END
-$;
+$$;
 
-DO $
+DO $$
 BEGIN
   IF (SELECT count(*) FROM public.stock_balances
       WHERE warehouse_id = current_setting('kasbeman.test_second_warehouse_id')::uuid) <> 1 THEN
@@ -680,7 +681,7 @@ RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000003';
 
-DO $
+DO $$
 DECLARE
   v_business_id uuid := current_setting('kasbeman.test_business_id')::uuid;
 BEGIN
@@ -713,12 +714,12 @@ BEGIN
     RAISE EXCEPTION 'User can see rows belonging to another tenant';
   END IF;
 END
-$;
+$$;
 
 RESET ROLE;
 
 -- Composite tenant foreign keys must reject cross-tenant branch and product links.
-DO $
+DO $$
 BEGIN
   BEGIN
     INSERT INTO public.warehouses
@@ -732,6 +733,6 @@ BEGIN
   EXCEPTION WHEN foreign_key_violation THEN NULL;
   END;
 END
-$;
+$$;
 
 SELECT 'PostgreSQL 17: RLS enabled on all public tables, no anon table grants, invoker-safe views, tenant isolation across all business tables, scoped role delegation, cross-tenant foreign keys, sales/inventory, receipts and concurrency protections passed.' AS result;
