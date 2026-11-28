@@ -85,14 +85,16 @@ export default async function BusinessMembersPage({
 
   const canReadAssignments = permissionKeys.has("team.roles.assign") ||
     permissionKeys.has("team.members.read") || permissionKeys.has("team.members.manage");
-  const { data: branchRows } = canReadAssignments
+  const canManageBranches = permissionKeys.has("branches.manage");
+  const canReadBranches = permissionKeys.has("branches.read") || canManageBranches;
+  const canLoadBranches = canReadAssignments || canReadBranches;
+  const { data: branchRows } = canLoadBranches
     ? await supabase.from("branches")
-        .select("id,name,is_primary")
+        .select("id,name,code,is_primary,status")
         .eq("business_id", businessId)
-        .eq("status", "active")
         .order("is_primary", { ascending: false })
         .order("name")
-    : { data: [] as { id: string; name: string; is_primary: boolean }[] };
+    : { data: [] as { id: string; name: string; code: string | null; is_primary: boolean; status: string }[] };
   const branchNameById = new Map((branchRows ?? []).map((branch) => [branch.id, branch.name]));
   const { data: memberRoleRows } = canReadAssignments
     ? await supabase.from("member_role_assignments")
@@ -129,7 +131,8 @@ export default async function BusinessMembersPage({
         invitations={invitations ?? []}
         memberAssignments={memberAssignments}
         assignableRoles={assignableRoles}
-        branches={(branchRows ?? []).map(({ id, name, is_primary }) => ({ id, name, is_primary }))}
+        branches={(branchRows ?? []).map(({ id, name, is_primary }) => ({ id, name, is_primary, status }))}
+        canManageBranches={canManageBranches}
         canAssignRoles={permissionKeys.has("team.roles.assign")}
         canInvite={permissionKeys.has("team.members.invite")}
         canTransfer={permissionKeys.has("business.ownership.transfer")}
