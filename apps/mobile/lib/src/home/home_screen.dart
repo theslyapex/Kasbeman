@@ -372,30 +372,42 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-                  if (result.permissions.contains('team.members.read') ||
-                      result.permissions.contains('team.members.manage') ||
-                      result.permissions.contains('team.members.invite') ||
-                      result.permissions.contains('team.roles.manage') ||
-                      result.permissions.contains('business.ownership.transfer')) ...[
-                    const SizedBox(height: 14),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => TeamScreen(
-                                membership: widget.membership,
-                                permissions: result.permissions,
+                  FutureBuilder<_BranchLoadResult>(
+                    future: _branchesFuture,
+                    builder: (context, teamSnapshot) {
+                      final permissions = teamSnapshot.data?.permissions ??
+                          const <String>{};
+                      final canOpenTeam =
+                          permissions.contains('team.members.read') ||
+                          permissions.contains('team.members.manage') ||
+                          permissions.contains('team.members.invite') ||
+                          permissions.contains('team.roles.manage') ||
+                          permissions.contains('business.ownership.transfer');
+                      if (!teamSnapshot.hasData || !canOpenTeam) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 14),
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: OutlinedButton.icon(
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => TeamScreen(
+                                    membership: widget.membership,
+                                    permissions: permissions,
+                                  ),
+                                ),
                               ),
+                              icon: const Icon(Icons.groups_outlined),
+                              label: const Text('مدیریت اعضا و دعوت‌ها'),
                             ),
                           ),
-                          icon: const Icon(Icons.groups_outlined),
-                          label: const Text('مدیریت اعضا و دعوت‌ها'),
                         ),
-                      ),
-                    ),
-                  ],
+                      );
+                    },
+                  ),
                   const SizedBox(height: 14),
                   Card(
                     child: Padding(
