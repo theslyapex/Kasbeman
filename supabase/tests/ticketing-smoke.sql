@@ -28,13 +28,23 @@ VALUES
  (:'business_id'::uuid, :'ticket_editor_role_id'::uuid, 'tickets.update'),
  (:'business_id'::uuid, :'ticket_editor_role_id'::uuid, 'tickets.comments.read');
 
+INSERT INTO public.roles (business_id, role_key, name, description, is_system, created_by)
+VALUES (:'business_id'::uuid, 'ticket-blind-assigner', 'تخصیص‌دهنده بدون مشاهده',
+        'Assignment permission without ticket read access must not mutate rows', false, auth.uid())
+RETURNING id AS ticket_blind_assigner_role_id \\gset
+INSERT INTO public.role_permissions (business_id, role_id, permission_key)
+VALUES (:'business_id'::uuid, :'ticket_blind_assigner_role_id'::uuid, 'tickets.assign');
+INSERT INTO public.business_members (business_id,user_id,role_key,status)
+VALUES (:'business_id'::uuid,'10000000-0000-4000-8000-000000000005','member','active');
 INSERT INTO public.member_role_assignments
  (business_id,user_id,role_id,branch_id,status,assigned_by)
 VALUES
  (:'business_id'::uuid,'10000000-0000-4000-8000-000000000002',
   :'ticket_operator_role_id'::uuid, :'branch_id'::uuid,'active',auth.uid()),
  (:'business_id'::uuid,'10000000-0000-4000-8000-000000000004',
-  :'ticket_editor_role_id'::uuid,NULL,'active',auth.uid());
+  :'ticket_editor_role_id'::uuid,NULL,'active',auth.uid()),
+ (:'business_id'::uuid,'10000000-0000-4000-8000-000000000005',
+  :'ticket_blind_assigner_role_id'::uuid, :'branch_id'::uuid,'active',auth.uid());
 
 INSERT INTO public.tickets
  (business_id,branch_id,ticket_number,title,description,priority,
@@ -61,6 +71,27 @@ VALUES
 
 SELECT set_config('kasbeman.test_primary_ticket_id', :'primary_ticket_id', false);
 SELECT set_config('kasbeman.test_second_ticket_id', :'second_ticket_id', false);
+
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000005';
+
+DO $ticket_blind_mutation$
+DECLARE
+ v_ticket uuid := current_setting('kasbeman.test_primary_ticket_id')::uuid;
+ v_rows integer;
+BEGIN
+ IF EXISTS (SELECT 1 FROM public.tickets WHERE id=v_ticket) THEN
+   RAISE EXCEPTION 'User without tickets.read can see a ticket';
+ END IF;
+ UPDATE public.tickets SET assignee_user_id='10000000-0000-4000-8000-000000000005'
+ WHERE id=v_ticket;
+ GET DIAGNOSTICS v_rows = ROW_COUNT;
+ IF v_rows <> 0 THEN
+   RAISE EXCEPTION 'Assignment-only user mutated a ticket without tickets.read';
+ END IF;
+END
+$ticket_blind_mutation$;
 
 RESET ROLE;
 SET ROLE authenticated;
