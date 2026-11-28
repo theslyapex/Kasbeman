@@ -23,6 +23,7 @@ class _TeamScreenState extends State<TeamScreen> {
   String get _businessId => widget.membership.businessId;
   bool get _canInvite => widget.permissions.contains('team.members.invite');
   bool get _canTransfer => widget.permissions.contains('business.ownership.transfer');
+  bool get _canManageMembers => widget.permissions.contains('team.members.manage');
 
   @override
   void initState() { super.initState(); _load(); }
@@ -135,6 +136,44 @@ class _TeamScreenState extends State<TeamScreen> {
     } finally { if (mounted) setState(() => _busy = false); }
   }
 
+  Future<void> _suspendMember(Map<String, dynamic> member) async {
+    final targetUserId = member['user_id'] as String;
+    if (targetUserId == _client.auth.currentUser?.id || member['role_key'] == 'owner') {
+      _showMessage('تعلیق حساب خودتان یا مالک کسب‌وکار مجاز نیست.');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تعلیق عضویت'),
+        content: const Text('دسترسی این عضو به کسب‌وکار تعلیق می‌شود و نقش‌های فعال او نیز لغو خواهند شد. برای بازگشت، باید دعوت‌نامه جدیدی به همان ایمیل ارسال و توسط همان حساب پذیرفته شود.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('تعلیق عضو')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _busy = true);
+    try {
+      final rows = await _client.from('business_members')
+          .update({'status': 'suspended'})
+          .eq('business_id', _businessId)
+          .eq('user_id', targetUserId)
+          .eq('status', 'active')
+          .select('user_id');
+      if (rows.isEmpty) throw const FormatException();
+      await _load();
+      if (mounted) _showMessage('عضویت تعلیق شد و دسترسی‌های فعال لغو شدند.');
+    } on PostgrestException {
+      if (mounted) _showMessage('تعلیق انجام نشد؛ ممکن است مجوز کافی نداشته باشی یا عضو مالک باشد.');
+    } catch (_) {
+      if (mounted) _showMessage('تعلیق عضو انجام نشد.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _transferOwnership() async {
     final candidates = _members.where((member) =>
       member['status'] == 'active' && member['role_key'] != 'owner').toList();
@@ -214,7 +253,22 @@ class _TeamScreenState extends State<TeamScreen> {
                 leading: const CircleAvatar(child: Icon(Icons.person_outline)),
                 title: Text(_roleLabel(member['role_key'] as String?)),
                 subtitle: Text(member['user_id'] as String, textDirection: TextDirection.ltr, maxLines: 1, overflow: TextOverflow.ellipsis),
-                trailing: Text(member['status'] == 'active' ? 'فعال' : member['status'] as String),
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(member['status'] == 'active'
+                      ? 'فعال'
+                      : member['status'] == 'suspended'
+                          ? 'تعلیق‌شده'
+                          : member['status'] as String),
+                  if (_canManageMembers &&
+                      member['status'] == 'active' &&
+                      member['role_key'] != 'owner' &&
+                      member['user_id'] != _client.auth.currentUser?.id)
+                    IconButton(
+                      tooltip: 'تعلیق عضو',
+                      onPressed: _busy ? null : () => _suspendMember(member),
+                      icon: const Icon(Icons.person_off_outlined),
+                    ),
+                ]),
               ))),
               const SizedBox(height: 18),
               Text('دعوت‌نامه‌ها', style: Theme.of(context).textTheme.titleMedium),
@@ -236,7 +290,7 @@ class _TeamScreenState extends State<TeamScreen> {
                 OutlinedButton.icon(onPressed: _busy ? null : _transferOwnership, icon: const Icon(Icons.swap_horiz), label: const Text('انتقال مالکیت کسب‌وکار')),
               ],
               const SizedBox(height: 20),
-              const Text('تعلیق عضویت تا افزودن مسیر مجاز اختصاصی در دیتابیس غیرفعال است.', style: TextStyle(color: Colors.white54, fontSize: 12)),
+              const Text('برای بازگرداندن دسترسی عضو تعلیق‌شده، دعوت‌نامه جدیدی به همان ایمیل بفرستید تا همان حساب آن را بپذیرد. حذف دائمی عضویت از این صفحه ارائه نمی‌شود.', style: TextStyle(color: Colors.white54, fontSize: 12)),
             ]),
       ))),
     );
