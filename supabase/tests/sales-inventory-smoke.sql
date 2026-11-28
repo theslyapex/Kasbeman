@@ -655,9 +655,9 @@ BEGIN
     RAISE EXCEPTION 'CRM read-only role unexpectedly updated a customer';
   END IF;
 END
-$;
+$permission_enforcement_test$;
 
-DO $
+DO $permission_enforcement_test$
 BEGIN
   BEGIN
     INSERT INTO public.customers (business_id, name, created_by)
@@ -700,7 +700,7 @@ RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000004';
 
-DO $
+DO $permission_enforcement_test$
 BEGIN
   UPDATE public.customers
   SET name = 'مشتری ویرایش‌شده توسط ویرایشگر'
@@ -745,7 +745,7 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
 END
-$;
+$permission_enforcement_test$;
 
 RESET ROLE;
 SET ROLE authenticated;
