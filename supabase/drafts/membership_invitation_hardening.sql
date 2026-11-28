@@ -14,6 +14,12 @@ security definer
 set search_path = ''
 as $$
 begin
+  -- Serialize membership status changes with ownership transfers.
+  perform 1
+  from public.businesses b
+  where b.id = old.business_id
+  for update;
+
   if old.status = 'active' and new.status in ('suspended', 'revoked') then
     if exists (
       select 1
@@ -63,6 +69,12 @@ as $$
 declare
   v_role_key text;
 begin
+  -- Serialize assignment revocation/deletion with ownership transfers.
+  perform 1
+  from public.businesses b
+  where b.id = old.business_id
+  for update;
+
   select r.role_key into v_role_key
   from public.roles r
   where r.business_id = old.business_id
