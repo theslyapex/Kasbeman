@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -257,7 +259,7 @@ export async function saveCustomRoleAction(input: {
       }
     }
   } else {
-    const roleKey = `custom_${crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`;
+    const roleKey = `custom_${randomUUID().replace(/-/g, "").slice(0, 24)}`;
     const { data: role, error: insertRoleError } = await supabase
       .from("roles")
       .insert({
