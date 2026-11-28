@@ -1,5 +1,45 @@
 \set ON_ERROR_STOP on
 
+-- Every application table in the exposed public schema must enforce RLS.
+DO $
+DECLARE
+  v_table record;
+  v_privilege text;
+BEGIN
+  FOR v_table IN
+    SELECT c.oid, c.relname, c.relrowsecurity
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind = 'r'
+  LOOP
+    IF NOT v_table.relrowsecurity THEN
+      RAISE EXCEPTION 'RLS is disabled on public table: %', v_table.relname;
+    END IF;
+
+    FOREACH v_privilege IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE'] LOOP
+      IF has_table_privilege('anon', v_table.oid, v_privilege) THEN
+        RAISE EXCEPTION 'anon has % privilege on public table %',
+          v_privilege, v_table.relname;
+      END IF;
+    END LOOP;
+  END LOOP;
+
+  -- Public views must not silently bypass the underlying table policies.
+  FOR v_table IN
+    SELECT c.relname, c.reloptions
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind = 'v'
+  LOOP
+    IF NOT coalesce('security_invoker=true' = ANY(v_table.reloptions), false) THEN
+      RAISE EXCEPTION 'Public view is not security_invoker: %', v_table.relname;
+    END IF;
+  END LOOP;
+END
+$;
+
 -- Function ACL regression checks. has_function_privilege() includes inherited
 -- PUBLIC grants, so a true result for anon would catch an accidental PUBLIC EXECUTE.
 DO $$
@@ -53,7 +93,8 @@ $$;
 INSERT INTO auth.users (id, raw_user_meta_data) VALUES
   ('10000000-0000-4000-8000-000000000001', '{"full_name":"Kasbeman Test Owner"}'),
   ('10000000-0000-4000-8000-000000000002', '{"full_name":"Kasbeman Test Branch Member"}'),
-  ('10000000-0000-4000-8000-000000000003', '{"full_name":"Kasbeman Test Unrelated User"}');
+  ('10000000-0000-4000-8000-000000000003', '{"full_name":"Kasbeman Test Unrelated User"}'),
+  ('10000000-0000-4000-8000-000000000004', '{"full_name":"Kasbeman Test Assignment Target"}');
 
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
@@ -61,6 +102,28 @@ SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 SELECT public.create_business('کسب‌وکار آزمایشی', 'kasbeman-ci-tenant') AS business_id \gset
 SELECT id AS branch_id FROM public.branches WHERE business_id = :'business_id'::uuid AND is_primary \gset
 SELECT id AS warehouse_id FROM public.warehouses WHERE business_id = :'business_id'::uuid AND is_default \gset
+
+-- A separate authenticated user owns a second tenant; later assertions verify
+-- that neither tenant can read or cross-link the other's rows.
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000003';
+SELECT public.create_business('کسب‌وکار دوم آزمایشی', 'kasbeman-ci-other-tenant') AS other_business_id \gset
+SELECT id AS other_branch_id
+FROM public.branches
+WHERE business_id = :'other_business_id'::uuid AND is_primary \gset
+INSERT INTO public.products
+  (business_id, name, product_type, sale_price, purchase_price, created_by)
+VALUES
+  (:'other_business_id'::uuid, 'کالای مستأجر دوم', 'goods', 15, 7, auth.uid())
+RETURNING id AS other_product_id \gset
+SELECT set_config('kasbeman.test_other_business_id', :'other_business_id', false);
+SELECT set_config('kasbeman.test_other_branch_id', :'other_branch_id', false);
+SELECT set_config('kasbeman.test_other_product_id', :'other_product_id', false);
+
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 
 INSERT INTO public.customers (business_id, name, created_by)
 VALUES (:'business_id'::uuid, 'مشتری آزمایشی', auth.uid())
@@ -97,7 +160,9 @@ INSERT INTO public.stock_movements (
 
 RESET ROLE;
 INSERT INTO public.business_members (business_id, user_id, role_key, status)
-VALUES (:'business_id'::uuid, '10000000-0000-4000-8000-000000000002', 'member', 'active');
+VALUES
+  (:'business_id'::uuid, '10000000-0000-4000-8000-000000000002', 'member', 'active'),
+  (:'business_id'::uuid, '10000000-0000-4000-8000-000000000004', 'member', 'active');
 
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
@@ -162,6 +227,34 @@ VALUES (
   'active',
   auth.uid()
 );
+
+-- A limited role assigner may delegate only permissions they personally hold.
+INSERT INTO public.roles (business_id, role_key, name, description, is_system, created_by)
+VALUES (:'business_id'::uuid, 'limited-role-assigner', 'تخصیص‌دهنده محدود',
+        'Can assign roles, but has no finance permissions', false, auth.uid())
+RETURNING id AS limited_assigner_role_id \gset
+INSERT INTO public.role_permissions (business_id, role_id, permission_key)
+VALUES (:'business_id'::uuid, :'limited_assigner_role_id'::uuid, 'team.roles.assign');
+INSERT INTO public.member_role_assignments
+  (business_id, user_id, role_id, branch_id, status, assigned_by)
+VALUES (
+  :'business_id'::uuid,
+  '10000000-0000-4000-8000-000000000002',
+  :'limited_assigner_role_id'::uuid,
+  NULL,
+  'active',
+  auth.uid()
+);
+
+INSERT INTO public.roles (business_id, role_key, name, description, is_system, created_by)
+VALUES (:'business_id'::uuid, 'target-stock-reader', 'مشاهده‌گر موجودی هدف',
+        'Branch-only stock reader for assignment regression test', false, auth.uid())
+RETURNING id AS target_stock_role_id \gset
+INSERT INTO public.role_permissions (business_id, role_id, permission_key)
+VALUES (:'business_id'::uuid, :'target_stock_role_id'::uuid, 'inventory.stock.read');
+SELECT id AS admin_role_id
+FROM public.roles
+WHERE business_id = :'business_id'::uuid AND role_key = 'admin' \gset
 
 SELECT set_config('kasbeman.test_business_id', :'business_id', false);
 SELECT set_config('kasbeman.test_branch_id', :'branch_id', false);
@@ -407,7 +500,39 @@ RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
 
-DO $$
+-- A branch-limited assignment within the actor's own permissions is allowed.
+INSERT INTO public.member_role_assignments
+  (business_id, user_id, role_id, branch_id, status, assigned_by)
+VALUES (
+  :'business_id'::uuid,
+  '10000000-0000-4000-8000-000000000004',
+  :'target_stock_role_id'::uuid,
+  :'second_branch_id'::uuid,
+  'active',
+  auth.uid()
+);
+
+-- The same actor must not be able to delegate the broader system admin role.
+DO $
+BEGIN
+  BEGIN
+    INSERT INTO public.member_role_assignments
+      (business_id, user_id, role_id, branch_id, status, assigned_by)
+    VALUES (
+      current_setting('kasbeman.test_business_id')::uuid,
+      '10000000-0000-4000-8000-000000000004',
+      :'admin_role_id'::uuid,
+      NULL,
+      'active',
+      auth.uid()
+    );
+    RAISE EXCEPTION 'Limited role assigner escalated a target member to admin';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+END
+$;
+
+DO $
 BEGIN
   IF (SELECT count(*) FROM public.stock_balances
       WHERE warehouse_id = current_setting('kasbeman.test_second_warehouse_id')::uuid) <> 1 THEN
@@ -555,16 +680,58 @@ RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000003';
 
-DO $$
+DO $
+DECLARE
+  v_business_id uuid := current_setting('kasbeman.test_business_id')::uuid;
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.businesses WHERE slug = 'kasbeman-ci-tenant') THEN
-    RAISE EXCEPTION 'Unrelated user can see another tenant business';
+  IF NOT EXISTS (
+    SELECT 1 FROM public.businesses
+    WHERE id = current_setting('kasbeman.test_other_business_id')::uuid
+  ) THEN
+    RAISE EXCEPTION 'User cannot see their own tenant';
   END IF;
-  IF EXISTS (SELECT 1 FROM public.customers WHERE name = 'مشتری آزمایشی') THEN
-    RAISE EXCEPTION 'Unrelated user can see another tenant customer';
+  IF EXISTS (SELECT 1 FROM public.businesses WHERE id = v_business_id) THEN
+    RAISE EXCEPTION 'User can see another tenant business';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.business_members WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.branches WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.business_invitations WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.roles WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.role_permissions WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.member_role_assignments WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.customers WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.products WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.warehouses WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.stock_balances WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.stock_movements WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.sales WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.sale_items WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.customer_receipts WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.customer_receipt_reversals WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.customer_invoice_balance_summary WHERE business_id = v_business_id)
+     OR EXISTS (SELECT 1 FROM public.customer_purchase_summary WHERE business_id = v_business_id) THEN
+    RAISE EXCEPTION 'User can see rows belonging to another tenant';
   END IF;
 END
-$$;
+$;
 
 RESET ROLE;
-SELECT 'PostgreSQL 17: schema, sales, idempotent confirmation, stock transfers, duplicate-transfer protection, idempotent receipt retries, mismatched idempotency rejection, duplicate-reversal protection, insufficient-stock rollback, branch-scoped RBAC, read-only enforcement, and cross-tenant isolation passed.' AS result;
+
+-- Composite tenant foreign keys must reject cross-tenant branch and product links.
+DO $
+BEGIN
+  BEGIN
+    INSERT INTO public.warehouses
+      (business_id, branch_id, name, code, created_by)
+    VALUES (
+      current_setting('kasbeman.test_business_id')::uuid,
+      current_setting('kasbeman.test_other_branch_id')::uuid,
+      'Cross-tenant warehouse', 'X-TENANT', '10000000-0000-4000-8000-000000000001'
+    );
+    RAISE EXCEPTION 'Warehouse accepted a branch from another tenant';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+END
+$;
+
+SELECT 'PostgreSQL 17: RLS enabled on all public tables, no anon table grants, invoker-safe views, tenant isolation across all business tables, scoped role delegation, cross-tenant foreign keys, sales/inventory, receipts and concurrency protections passed.' AS result;
