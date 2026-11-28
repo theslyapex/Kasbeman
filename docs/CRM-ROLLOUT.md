@@ -46,10 +46,11 @@ The sales/inventory draft references the CRM-owned `public.customers` table but 
 
 - `supabase/tests/crm-customer-smoke.sql`: read-only, create-only, profile editor, archive guard, owner archive, tenant isolation, RLS and trigger ACL.
 - `scripts/check-crm-security.mjs`: verifies the canonical migration exists exactly once, its SQL body matches the reviewed draft, RLS/tenant key/guard/grants are present, and sales/inventory no longer owns customer schema.
-- `scripts/test-postgres-schema.sh`: applies the canonical CRM migration before sales/inventory and ticketing drafts on disposable PostgreSQL 17.
+- `scripts/test-postgres-schema.sh`: applies canonical CRM, ticketing and sales/inventory migrations in dependency order on disposable PostgreSQL 17.
 - Web CI for the CRM workspace: commit `e9f59df4947288ab948b90e8c6cd84c03ddb2ba5`; TypeScript, ESLint, PostgreSQL 17, concurrency and production build passed: https://github.com/theslyapex/Kasbeman/actions/runs/46145348146
 - Mobile CI: commit `fed6e3fd1282e6411a10b062ef6fd37544a7deed`; Flutter Analyze, tests and Android Debug build passed: https://github.com/theslyapex/Kasbeman/actions/runs/46145316201
-- Canonical migration CI: commit `a7f82fe52efdb925bc981cab6172e5a72f05fa45`; canonical migration security check, PostgreSQL 17 schema/tenant tests, multi-connection concurrency, vinext, TypeScript, ESLint and production build all passed: https://github.com/theslyapex/Kasbeman/actions/runs/46146010427
+- Canonical migration CI: commit `a7f82fe52efdb925bc981cab6172e5a72f05fa45`; CRM migration security check, PostgreSQL 17 schema/tenant tests, multi-connection concurrency, vinext, TypeScript, ESLint and production build all passed: https://github.com/theslyapex/Kasbeman/actions/runs/46146010427
+- Combined CRM + ticketing + sales/inventory CI: commit `f3b08c98a5725bc07b1e8fa80fc1a8c4f61786fc`; all three canonical migration/security checks, PostgreSQL 17 schema and tenant-isolation suite, multi-connection concurrency suite, TypeScript, ESLint and production build passed: https://github.com/theslyapex/Kasbeman/actions/runs/46146525793
 
 ## Required production rollout
 
@@ -63,4 +64,4 @@ Do not create a placeholder customer table, disable RLS, relax composite foreign
 
 ## Release gate
 
-The canonical CRM migration is generated and CI-tested, but has not been applied to production. No staging Supabase environment or live web/mobile E2E test has been established. The public deployment remains unconfigured, and `main` remains untouched.
+The canonical CRM migration is generated and has passed the combined PostgreSQL 17 CI suite alongside ticketing and sales/inventory. It has not been applied to production. No staging Supabase environment or live web/mobile E2E test has been established. The public deployment remains unconfigured, and `main` remains untouched.
