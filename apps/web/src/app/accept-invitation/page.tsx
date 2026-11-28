@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { AcceptInvitationForm } from "./accept-invitation-form";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
