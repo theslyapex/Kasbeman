@@ -148,7 +148,7 @@ BEGIN
  EXCEPTION WHEN insufficient_privilege THEN NULL;
  END;
  BEGIN
-   UPDATE public.tickets SET assignee_user_id='10000000-0000-4000-8000-000000000002'
+   UPDATE public.tickets SET assignee_user_id='10000000-0000-4000-8000-000000000004'
    WHERE id=v_ticket;
    RAISE EXCEPTION 'Content editor assigned a ticket without tickets.assign';
  EXCEPTION WHEN insufficient_privilege THEN NULL;
