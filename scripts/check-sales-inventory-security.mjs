@@ -81,6 +81,10 @@ if (!/grant select, insert on table public\.stock_movements to authenticated/i.t
   failures.push("stock_movements: expected controlled insert/read grant is missing");
 }
 
+if (/sales\.orders\.(read|manage)/.test(sql)) {
+  failures.push("sales/invoice policies still use legacy sales.orders permissions");
+}
+
 if (failures.length) {
   console.error(failures.map((failure) => `- ${failure}`).join("\\n"));
   process.exitCode = 1;
@@ -88,6 +92,3 @@ if (failures.length) {
   console.log(`Security structure checks passed for ${tables.length} public tables and ${securityDefinerBlocks.length} SECURITY DEFINER functions.`);
 }
 
-if (/sales\\.orders\\.(read|manage)/.test(sql)) {
-  failures.push("sales/invoice policies still use legacy sales.orders permissions");
-}
