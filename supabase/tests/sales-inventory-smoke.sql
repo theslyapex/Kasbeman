@@ -380,7 +380,7 @@ BEGIN
 END
 $$;
 
-DO $
+DO $$
 BEGIN
   BEGIN
     INSERT INTO public.customers (business_id, name, created_by)
