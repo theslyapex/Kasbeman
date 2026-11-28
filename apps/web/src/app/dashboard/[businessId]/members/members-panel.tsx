@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import {
   createInvitationAction,
   revokeInvitationAction,
+  suspendBusinessMemberAction,
   transferOwnershipAction,
   type TeamActionResult,
 } from "@/app/actions/team";
@@ -17,12 +18,16 @@ export function MembersPanel({
   invitations,
   canInvite,
   canTransfer,
+  canManageMembers,
+  currentUserId,
 }: {
   businessId: string;
   members: Member[];
   invitations: Invitation[];
   canInvite: boolean;
   canTransfer: boolean;
+  canManageMembers: boolean;
+  currentUserId: string;
 }) {
   const [busy, startTransition] = useTransition();
   const [result, setResult] = useState<TeamActionResult>({});
@@ -79,7 +84,20 @@ export function MembersPanel({
             <article className="team-row" key={member.user_id}>
               <div><strong>{member.role_key === "owner" ? "مالک" : member.role_key === "admin" ? "مدیر" : "عضو"}</strong>
                 <small dir="ltr">{member.user_id}</small></div>
-              <span className={member.status === "active" ? "business-status" : "team-muted"}>{member.status === "active" ? "فعال" : member.status}</span>
+              <div className="team-row-actions">
+                <span className={member.status === "active" ? "business-status" : "team-muted"}>{member.status === "active" ? "فعال" : member.status === "suspended" ? "تعلیق‌شده" : member.status}</span>
+                {canManageMembers && member.status === "active" && member.role_key !== "owner" && member.user_id !== currentUserId ? (
+                  <button
+                    className="text-danger"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!window.confirm("دسترسی این عضو به کسب‌وکار تعلیق شود؟ نقش‌های فعال او نیز لغو می‌شوند.")) return;
+                      run(() => suspendBusinessMemberAction(businessId, member.user_id));
+                    }}
+                  >تعلیق عضو</button>
+                ) : null}
+              </div>
             </article>
           ))}
           {members.length === 0 ? <p className="team-muted">عضوی برای نمایش وجود ندارد.</p> : null}
@@ -126,7 +144,7 @@ export function MembersPanel({
         </section>
       ) : null}
 
-      <p className="team-muted">تعلیق یا حذف عضویت از این صفحه فعلاً فعال نیست؛ این عملیات تا اضافه‌شدن RPC اختصاصی و مجوز محدود دیتابیس غیرفعال می‌ماند.</p>
+      <p className="team-muted">برای بازگرداندن دسترسی عضو تعلیق‌شده، یک دعوت‌نامه جدید به همان ایمیل ارسال کنید؛ پذیرش دعوت توسط همان حساب تأییدشده، عضویت و نقش مناسب را دوباره فعال می‌کند. حذف دائمی عضویت از این صفحه ارائه نمی‌شود.</p>
     </div>
   );
 }
