@@ -83,6 +83,24 @@ export default async function BusinessMembersPage({
       .map((item) => item.permission_key),
   }));
 
+  const canReadAssignments = permissionKeys.has("team.roles.assign") ||
+    permissionKeys.has("team.members.read") || permissionKeys.has("team.members.manage");
+  const { data: memberRoleRows } = canReadAssignments
+    ? await supabase.from("member_role_assignments")
+        .select("id,user_id,role_id,branch_id,status")
+        .eq("business_id", businessId)
+        .eq("status", "active")
+    : { data: [] as { id: string; user_id: string; role_id: string; branch_id: string | null; status: string }[] };
+
+  const roleNameById = new Map(roles.map((role) => [role.id, role.name]));
+  const memberAssignments = (memberRoleRows ?? []).map((assignment) => ({
+    ...assignment,
+    roleName: roleNameById.get(assignment.role_id) ?? "نقش نامشخص",
+  }));
+  const assignableRoles = roles
+    .filter((role) => !role.is_system && role.status === "active")
+    .map(({ id, name, description }) => ({ id, name, description }));
+
   return (
     <main className="dashboard-shell">
       <header className="dashboard-topbar">
@@ -99,6 +117,9 @@ export default async function BusinessMembersPage({
         businessId={businessId}
         members={members ?? []}
         invitations={invitations ?? []}
+        memberAssignments={memberAssignments}
+        assignableRoles={assignableRoles}
+        canAssignRoles={permissionKeys.has("team.roles.assign")}
         canInvite={permissionKeys.has("team.members.invite")}
         canTransfer={permissionKeys.has("business.ownership.transfer")}
         canManageMembers={permissionKeys.has("team.members.manage")}
