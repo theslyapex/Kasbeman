@@ -94,7 +94,9 @@ INSERT INTO auth.users (id, raw_user_meta_data) VALUES
   ('10000000-0000-4000-8000-000000000001', '{"full_name":"Kasbeman Test Owner"}'),
   ('10000000-0000-4000-8000-000000000002', '{"full_name":"Kasbeman Test Branch Member"}'),
   ('10000000-0000-4000-8000-000000000003', '{"full_name":"Kasbeman Test Unrelated User"}'),
-  ('10000000-0000-4000-8000-000000000004', '{"full_name":"Kasbeman Test Assignment Target"}');
+  ('10000000-0000-4000-8000-000000000004', '{"full_name":"Kasbeman Test Assignment Target"}'),
+  ('10000000-0000-4000-8000-000000000005', '{"full_name":"Kasbeman Test Invite Recipient"}'),
+  ('10000000-0000-4000-8000-000000000006', '{"full_name":"Kasbeman Test Wrong Invite Recipient"}');
 
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
