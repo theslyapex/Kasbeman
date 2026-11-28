@@ -8,7 +8,9 @@ psql -v ON_ERROR_STOP=1 \
   -f supabase/migrations/20261128080751_rbac_role_assignment_hardening.sql \
   -f supabase/migrations/20261128080753_membership_invitation_ownership_hardening.sql \
   -f supabase/migrations/20261128085653_add_missing_fk_indexes.sql \
+  -f supabase/drafts/business_creation_rate_limit.sql \
   -f supabase/drafts/sales_inventory_core.sql \
   -f supabase/tests/sales-inventory-smoke.sql \
+  -f supabase/tests/business-creation-rate-limit-smoke.sql \
   -f supabase/tests/membership-invitation-smoke.sql \
   -f supabase/tests/fk-index-smoke.sql
