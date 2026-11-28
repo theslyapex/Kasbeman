@@ -23,6 +23,7 @@ class _TeamScreenState extends State<TeamScreen> {
   List<Map<String, dynamic>> _customRoles = [];
   List<Map<String, dynamic>> _roleAssignments = [];
   List<Map<String, dynamic>> _branches = [];
+  Map<String, String> _permissionLabels = {};
 
   String get _businessId => widget.membership.businessId;
   bool get _canInvite => widget.permissions.contains('team.members.invite');
@@ -51,6 +52,32 @@ class _TeamScreenState extends State<TeamScreen> {
               .eq('status', 'active')
               .order('name')
           : <Map<String, dynamic>>[];
+      final permissionLabels = _canAssignRoles
+          ? await _client.from('permissions')
+              .select('permission_key,label_fa')
+          : <Map<String, dynamic>>[];
+      final rolePermissionRows = _canAssignRoles && customRoles.isNotEmpty
+          ? await _client.from('role_permissions')
+              .select('role_id,permission_key')
+              .eq('business_id', _businessId)
+              .inFilter('role_id', customRoles.map((role) => role['id'] as String).toList())
+          : <Map<String, dynamic>>[];
+      final labelsByKey = <String, String>{
+        for (final row in permissionLabels)
+          row['permission_key'] as String: row['label_fa'] as String,
+      };
+      final keysByRole = <String, List<String>>{};
+      for (final row in rolePermissionRows) {
+        keysByRole.putIfAbsent(row['role_id'] as String, () => <String>[])
+            .add(row['permission_key'] as String);
+      }
+      final enrichedRoles = customRoles.map((role) {
+        final item = Map<String, dynamic>.from(role);
+        final keys = keysByRole[item['id'] as String] ?? <String>[];
+        item['permission_keys'] = keys;
+        item['permission_labels'] = keys.map((key) => labelsByKey[key] ?? key).toList();
+        return item;
+      }).toList();
       final branches = (_canAssignRoles || _canManageMembers ||
               widget.permissions.contains('team.members.read'))
           ? await _client.from('branches')
@@ -71,7 +98,8 @@ class _TeamScreenState extends State<TeamScreen> {
       setState(() {
         _members = List<Map<String, dynamic>>.from(members);
         _invitations = List<Map<String, dynamic>>.from(invitations);
-        _customRoles = List<Map<String, dynamic>>.from(customRoles);
+        _customRoles = List<Map<String, dynamic>>.from(enrichedRoles);
+        _permissionLabels = labelsByKey;
         _roleAssignments = List<Map<String, dynamic>>.from(roleAssignments);
         _branches = List<Map<String, dynamic>>.from(branches);
         _loading = false;
@@ -193,6 +221,34 @@ class _TeamScreenState extends State<TeamScreen> {
                 onChanged: (value) => setDialogState(() => selectedRoleId = value),
               ),
               const SizedBox(height: 12),
+              if (selectedRoleId != null) ...[
+                const SizedBox(height: 12),
+                Builder(builder: (context) {
+                  final selectedRole = _customRoles.firstWhere(
+                    (role) => role['id'] == selectedRoleId,
+                  );
+                  final labels = (selectedRole['permission_labels'] as List?)?.cast<String>() ?? const <String>[];
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('مجوزهای این نقش', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text(labels.isEmpty ? 'بدون مجوز ثبت‌شده' : labels.join('، ')),
+                        const SizedBox(height: 4),
+                        const Text('این مجوزها فقط در محدوده انتخاب‌شده اعمال می‌شوند.',
+                          style: TextStyle(fontSize: 11)),
+                      ],
+                    ),
+                  );
+                }),
+              ],
               DropdownButtonFormField<String>(
                 initialValue: selectedBranchId,
                 decoration: const InputDecoration(labelText: 'محدوده دسترسی'),
