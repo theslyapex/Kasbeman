@@ -93,6 +93,26 @@ VALUES (
   auth.uid()
 );
 
+-- CRM read access is independent from financial and sales access.
+INSERT INTO public.roles (business_id, role_key, name, description, is_system, created_by)
+VALUES (:'business_id'::uuid, 'customer-reader', 'مشاهده‌گر مشتریان',
+        'CRM read-only role for CI', false, auth.uid())
+RETURNING id AS customer_reader_role_id \gset
+
+INSERT INTO public.role_permissions (business_id, role_id, permission_key)
+VALUES (:'business_id'::uuid, :'customer_reader_role_id'::uuid, 'crm.customers.read');
+
+INSERT INTO public.member_role_assignments
+  (business_id, user_id, role_id, branch_id, status, assigned_by)
+VALUES (
+  :'business_id'::uuid,
+  '10000000-0000-4000-8000-000000000002',
+  :'customer_reader_role_id'::uuid,
+  NULL,
+  'active',
+  auth.uid()
+);
+
 SELECT set_config('kasbeman.test_business_id', :'business_id', false);
 SELECT set_config('kasbeman.test_branch_id', :'branch_id', false);
 SELECT set_config('kasbeman.test_warehouse_id', :'warehouse_id', false);
@@ -348,13 +368,40 @@ BEGIN
     RAISE EXCEPTION 'Branch-scoped stock reader can see stock from an unassigned branch';
   END IF;
   IF EXISTS (SELECT 1 FROM public.sales) THEN
-    RAISE EXCEPTION 'Stock-only role can see sales without sales.orders.read';
+    RAISE EXCEPTION 'Member without sales.invoices.read can see sales';
+  END IF;
+  IF (SELECT count(*) FROM public.products
+      WHERE id = current_setting('kasbeman.test_product_id')::uuid) <> 1 THEN
+    RAISE EXCEPTION 'inventory.items.read did not grant business-wide product visibility';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.customers WHERE name = 'مشتری آزمایشی') THEN
+    RAISE EXCEPTION 'crm.customers.read did not grant customer visibility';
   END IF;
 END
 $$;
 
-DO $$
+DO $
 BEGIN
+  BEGIN
+    INSERT INTO public.customers (business_id, name, created_by)
+    VALUES (
+      current_setting('kasbeman.test_business_id')::uuid,
+      'Unauthorized customer creation',
+      auth.uid()
+    );
+    RAISE EXCEPTION 'CRM read-only role unexpectedly created a customer';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    INSERT INTO public.products (
+      business_id, name, product_type, sale_price, purchase_price, created_by
+    ) VALUES (
+      current_setting('kasbeman.test_business_id')::uuid,
+      'Unauthorized product creation', 'goods', 10, 5, auth.uid()
+    );
+    RAISE EXCEPTION 'Item read-only role unexpectedly created a product';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
   BEGIN
     INSERT INTO public.stock_movements (
       business_id, movement_type, product_id, quantity,
@@ -437,8 +484,12 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.businesses WHERE slug = 'kasbeman-ci-tenant') THEN
     RAISE EXCEPTION 'Active tenant member cannot see the business';
   END IF;
-  IF EXISTS (SELECT 1 FROM public.customers WHERE name = 'مشتری آزمایشی') THEN
-    RAISE EXCEPTION 'Branch-only member can see customers without CRM permission';
+  IF NOT EXISTS (SELECT 1 FROM public.customers WHERE name = 'مشتری آزمایشی') THEN
+    RAISE EXCEPTION 'CRM reader cannot see an authorized customer';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.customer_receipts
+      WHERE sale_id = current_setting('kasbeman.test_sale_id')::uuid) THEN
+    RAISE EXCEPTION 'CRM reader can see financial receipts without finance permission';
   END IF;
 END
 $$;
