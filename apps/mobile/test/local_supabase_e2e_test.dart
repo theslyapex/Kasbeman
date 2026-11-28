@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kasbeman_mobile/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +20,7 @@ Future<void> _pumpUntilVisible(
   fail('Widget did not appear before timeout: $finder');
 }
 
+@Tags(['local-supabase-e2e'])
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -38,7 +39,7 @@ void main() {
       final runId = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
       final email = 'kasbeman-mobile-e2e-$runId@example.com';
       final password = 'Mobile-E2E-$runId-Aa9!';
-      final businessName = 'کسب‌وکار آزمایش موبایل';
+      const businessName = 'کسب‌وکار آزمایش موبایل';
       final businessSlug = 'kasbeman-mobile-e2e-$runId';
 
       await tester.pumpWidget(const KasbemanApp(configured: true));
