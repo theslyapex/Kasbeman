@@ -2,6 +2,12 @@
 -- Run after sales-inventory-smoke.sql has created the CI Auth users.
 
 RESET ROLE;
+
+-- Keep this test independent from earlier smoke tests that may use the same CI identity.
+DELETE FROM private.operation_rate_limit_counters
+WHERE user_id = '10000000-0000-4000-8000-000000000006'
+  AND operation_key = 'business.create';
+
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000006';
 
