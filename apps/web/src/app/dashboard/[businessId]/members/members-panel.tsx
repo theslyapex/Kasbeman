@@ -45,8 +45,8 @@ export function MembersPanel({
         <section className="team-card">
           <h2>توکن دعوت</h2>
           <p>این توکن محرمانه است و فقط یک‌بار نمایش داده می‌شود. آن را فقط برای ایمیل دعوت‌شده ارسال کنید.</p>
-          <code className="invite-token" dir="ltr">{token}</code>
-          <button className="secondary-action" type="button" onClick={() => navigator.clipboard.writeText(token)}>کپی توکن</button>
+          <code className="invite-token" dir="ltr">{typeof window !== "undefined" ? `${window.location.origin}/accept-invitation?token=${token}` : token}</code>
+          <button className="secondary-action" type="button" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/accept-invitation?token=${token}`)}>کپی پیوند دعوت</button>
         </section>
       ) : null}
 
