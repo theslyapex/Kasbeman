@@ -223,6 +223,21 @@ revoke all on function private.record_ticket_event() from public,anon,authentica
 create trigger tickets_record_event after insert or update on public.tickets
  for each row execute function private.record_ticket_event();
 
+-- Record comment metadata automatically; never copy the comment body into the audit log.
+create or replace function private.record_ticket_comment_event()
+returns trigger language plpgsql security definer set search_path=''
+as $record_ticket_comment_event$
+begin
+ insert into public.ticket_events(business_id,ticket_id,actor_user_id,event_type,payload)
+ values (new.business_id,new.ticket_id,new.author_user_id,'comment_added',
+   jsonb_build_object('visibility',new.visibility));
+ return new;
+end;
+$record_ticket_comment_event$;
+revoke all on function private.record_ticket_comment_event() from public,anon,authenticated;
+create trigger ticket_comments_record_event after insert on public.ticket_comments
+ for each row execute function private.record_ticket_comment_event();
+
 alter table public.tickets enable row level security;
 alter table public.ticket_comments enable row level security;
 alter table public.ticket_events enable row level security;
@@ -261,7 +276,10 @@ create policy ticket_comments_insert_permission on public.ticket_comments for in
 create policy ticket_events_select_permission on public.ticket_events for select to authenticated
  using (exists(select 1 from public.tickets t
   where t.business_id=ticket_events.business_id and t.id=ticket_events.ticket_id
-  and private.has_business_permission(t.business_id,'tickets.read',t.branch_id)));
+  and private.has_business_permission(t.business_id,'tickets.read',t.branch_id)
+  and (ticket_events.event_type <> 'comment_added'
+       or coalesce(ticket_events.payload->>'visibility','public') <> 'internal'
+       or private.has_business_permission(t.business_id,'tickets.comments.internal.read',t.branch_id))));
 
 revoke all on table public.tickets,public.ticket_comments,public.ticket_events from anon,authenticated;
 grant select on public.tickets to authenticated;
