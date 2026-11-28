@@ -82,7 +82,7 @@ RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000004';
 UPDATE public.customers
-SET name='مشتری ویرایش‌شده در آزمون CRM', phone='09120000000'
+SET phone='09120000000'
 WHERE id=current_setting('kasbeman.test_customer_id')::uuid;
 
 DO $crm_editor_archive_guard$
@@ -97,8 +97,7 @@ BEGIN
  IF (SELECT status FROM public.customers WHERE id=v_customer) <> 'active' THEN
    RAISE EXCEPTION 'Denied CRM archive changed customer status';
  END IF;
- IF (SELECT name FROM public.customers WHERE id=v_customer)
-    <> 'مشتری ویرایش‌شده در آزمون CRM' THEN
+ IF (SELECT phone FROM public.customers WHERE id=v_customer) <> '09120000000' THEN
    RAISE EXCEPTION 'CRM editor profile update did not persist';
  END IF;
 END
@@ -156,7 +155,8 @@ SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 UPDATE public.customers
 SET status='archived'
-WHERE id=current_setting('kasbeman.test_customer_id')::uuid;
+WHERE name='مشتری ایجادشده توسط نقش محدود'
+  AND business_id=:'business_id'::uuid;
 
 DO $crm_structure$
 DECLARE
