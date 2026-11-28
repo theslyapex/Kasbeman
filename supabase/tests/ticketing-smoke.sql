@@ -291,3 +291,46 @@ END
 $ticket_security_structure$;
 
 SELECT 'Ticketing security smoke tests passed: tenant and branch isolation, granular operation permissions, active assignee validation, internal-note confidentiality, immutable archive, and trigger-only append-only event history.' AS result;
+
+
+-- New tenants created after this schema is installed receive ticket permissions
+-- through the existing create_business bootstrap (not only through this draft's backfill).
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000006';
+SELECT public.create_business('کسب‌وکار مجوز تیکت', 'kasbeman-ci-ticket-perms') AS ticket_permission_business_id \gset
+
+DO $ticket_default_roles$
+BEGIN
+ IF NOT EXISTS (
+   SELECT 1
+   FROM public.roles r
+   JOIN public.role_permissions rp
+     ON rp.business_id=r.business_id AND rp.role_id=r.id
+   WHERE r.business_id=:'ticket_permission_business_id'::uuid
+     AND r.role_key='owner' AND rp.permission_key='tickets.read'
+ ) THEN
+   RAISE EXCEPTION 'New tenant owner role did not receive ticket permissions';
+ END IF;
+ IF NOT EXISTS (
+   SELECT 1
+   FROM public.roles r
+   JOIN public.role_permissions rp
+     ON rp.business_id=r.business_id AND rp.role_id=r.id
+   WHERE r.business_id=:'ticket_permission_business_id'::uuid
+     AND r.role_key='admin' AND rp.permission_key='tickets.read'
+ ) THEN
+   RAISE EXCEPTION 'New tenant admin role did not receive ticket permissions';
+ END IF;
+ IF EXISTS (
+   SELECT 1
+   FROM public.roles r
+   JOIN public.role_permissions rp
+     ON rp.business_id=r.business_id AND rp.role_id=r.id
+   WHERE r.business_id=:'ticket_permission_business_id'::uuid
+     AND r.role_key='member' AND rp.permission_key='tickets.delete'
+ ) THEN
+   RAISE EXCEPTION 'Default member role unexpectedly received ticket archive permission';
+ END IF;
+END
+$ticket_default_roles$;
