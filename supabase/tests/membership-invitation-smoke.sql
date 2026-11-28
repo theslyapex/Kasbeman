@@ -293,7 +293,7 @@ WHERE business_id = :'business_id'::uuid
 
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
-DO $
+DO $legacy_owner_guard$
 BEGIN
   IF private.can_manage_business_member(
     current_setting('kasbeman.test_business_id')::uuid,
@@ -302,10 +302,10 @@ BEGIN
     RAISE EXCEPTION 'Legacy owner was considered manageable';
   END IF;
 END
-$;
+$legacy_owner_guard$;
 
 RESET ROLE;
-DO $
+DO $legacy_owner_suspend$
 BEGIN
   BEGIN
     UPDATE public.business_members
@@ -316,7 +316,7 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL;
   END;
 END
-$;
+$legacy_owner_suspend$;
 
 UPDATE public.business_members
 SET role_key = 'member'
