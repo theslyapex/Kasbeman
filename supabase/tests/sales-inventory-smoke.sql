@@ -104,6 +104,51 @@ INSERT INTO auth.users (id, raw_user_meta_data) VALUES
   ('10000000-0000-4000-8000-000000000005', '{"full_name":"Kasbeman Test Invite Recipient"}'),
   ('10000000-0000-4000-8000-000000000006', '{"full_name":"Kasbeman Test Wrong Invite Recipient"}');
 
+-- The business bootstrap RPC must reject missing authentication and malformed input
+-- before creating any tenant rows. This endpoint intentionally remains available
+-- to authenticated users, but is never callable by anon/PUBLIC (checked above).
+RESET ROLE;
+SET ROLE authenticated;
+RESET request.jwt.claim.sub;
+
+DO $create_business_auth_guard$
+BEGIN
+  BEGIN
+    PERFORM public.create_business('بدون نشست', 'kasbeman-ci-no-session');
+    RAISE EXCEPTION 'create_business accepted a request without auth.uid()';
+  EXCEPTION WHEN SQLSTATE '28000' THEN
+    NULL;
+  END;
+END
+$create_business_auth_guard$;
+
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
+
+DO $create_business_input_guard$
+BEGIN
+  BEGIN
+    PERFORM public.create_business('x', 'kasbeman-ci-short-name');
+    RAISE EXCEPTION 'create_business accepted a too-short business name';
+  EXCEPTION WHEN invalid_parameter_value THEN
+    NULL;
+  END;
+
+  BEGIN
+    PERFORM public.create_business('نام معتبر', 'INVALID SLUG!');
+    RAISE EXCEPTION 'create_business accepted a malformed slug';
+  EXCEPTION WHEN invalid_parameter_value THEN
+    NULL;
+  END;
+
+  IF EXISTS (
+    SELECT 1 FROM public.businesses
+    WHERE slug IN ('kasbeman-ci-no-session', 'kasbeman-ci-short-name')
+  ) THEN
+    RAISE EXCEPTION 'Rejected create_business requests left tenant rows behind';
+  END IF;
+END
+$create_business_input_guard$;
+
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 
