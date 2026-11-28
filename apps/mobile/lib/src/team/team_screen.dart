@@ -50,7 +50,7 @@ class _TeamScreenState extends State<TeamScreen> {
               .eq('status', 'active')
               .order('name')
           : <Map<String, dynamic>>[];
-      final roleAssignments = (_canAssignRoles || _canManageMembers ||
+      final roleAssignments = (_canAssignRoles ||
               widget.permissions.contains('team.members.read'))
           ? await _client.from('member_role_assignments')
               .select('id,user_id,role_id,branch_id,status')
