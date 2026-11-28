@@ -73,6 +73,26 @@ VALUES (
   auth.uid()
 );
 
+-- Item catalogue visibility is business-wide; stock visibility remains branch-scoped.
+INSERT INTO public.roles (business_id, role_key, name, description, is_system, created_by)
+VALUES (:'business_id'::uuid, 'global-item-reader', 'مشاهده‌گر کالاها',
+        'Business-wide item read role for CI', false, auth.uid())
+RETURNING id AS item_reader_role_id \gset
+
+INSERT INTO public.role_permissions (business_id, role_id, permission_key)
+VALUES (:'business_id'::uuid, :'item_reader_role_id'::uuid, 'inventory.items.read');
+
+INSERT INTO public.member_role_assignments
+  (business_id, user_id, role_id, branch_id, status, assigned_by)
+VALUES (
+  :'business_id'::uuid,
+  '10000000-0000-4000-8000-000000000002',
+  :'item_reader_role_id'::uuid,
+  NULL,
+  'active',
+  auth.uid()
+);
+
 SELECT set_config('kasbeman.test_business_id', :'business_id', false);
 SELECT set_config('kasbeman.test_branch_id', :'branch_id', false);
 SELECT set_config('kasbeman.test_warehouse_id', :'warehouse_id', false);
