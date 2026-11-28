@@ -106,7 +106,12 @@ export function MembersPanel({
         <section className="team-card team-danger-zone">
           <h2>انتقال مالکیت</h2>
           <p>مالک جدید باید عضو فعال همین کسب‌وکار باشد. پس از انتقال، نقش شما به مدیر تغییر می‌کند.</p>
-          <form className="team-form" action={(formData) => run(() => transferOwnershipAction(formData))}>
+          <form className="team-form" onSubmit={(event) => {
+            event.preventDefault();
+            if (!window.confirm("مالکیت این کسب‌وکار به عضو انتخاب‌شده منتقل شود؟ نقش شما به مدیر تغییر خواهد کرد.")) return;
+            const formData = new FormData(event.currentTarget);
+            run(() => transferOwnershipAction(formData));
+          }}>
             <input type="hidden" name="businessId" value={businessId} />
             <label className="field"><span>مالک جدید</span>
               <select name="newOwnerUserId" required defaultValue="">
