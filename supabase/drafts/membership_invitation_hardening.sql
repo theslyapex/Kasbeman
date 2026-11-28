@@ -127,6 +127,9 @@ declare
   v_admin_role_id uuid;
   v_owner_count integer;
   v_actor_owner_count integer;
+  v_branch_scoped_owner_count integer;
+  v_legacy_owner_count integer;
+  v_actor_legacy_owner_count integer;
 begin
   if v_actor_id is null then
     raise exception 'Authentication required' using errcode = '28000';
@@ -156,8 +159,9 @@ begin
   end if;
 
   select count(*)::integer,
-         count(*) filter (where bm.user_id = v_actor_id)::integer
-  into v_owner_count, v_actor_owner_count
+         count(*) filter (where bm.user_id = v_actor_id)::integer,
+         count(*) filter (where mra.branch_id is not null)::integer
+  into v_owner_count, v_actor_owner_count, v_branch_scoped_owner_count
   from public.business_members bm
   join public.member_role_assignments mra
     on mra.business_id = bm.business_id
@@ -167,11 +171,24 @@ begin
     on r.business_id = mra.business_id
    and r.id = mra.role_id
    and r.role_key = 'owner'
+   and r.is_system
    and r.status = 'active'
   where bm.business_id = p_business_id
     and bm.status = 'active';
 
-  if v_owner_count <> 1 or v_actor_owner_count <> 1 then
+  select count(*)::integer,
+         count(*) filter (where bm.user_id = v_actor_id)::integer
+  into v_legacy_owner_count, v_actor_legacy_owner_count
+  from public.business_members bm
+  where bm.business_id = p_business_id
+    and bm.status = 'active'
+    and bm.role_key = 'owner';
+
+  if v_owner_count <> 1
+     or v_actor_owner_count <> 1
+     or v_branch_scoped_owner_count <> 0
+     or v_legacy_owner_count <> 1
+     or v_actor_legacy_owner_count <> 1 then
     raise exception 'Ownership state is inconsistent; contact support before transfer'
       using errcode = '23514';
   end if;
