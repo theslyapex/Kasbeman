@@ -176,7 +176,7 @@ SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
 
 UPDATE public.tickets
-SET assignee_user_id='10000000-0000-4000-8000-000000000004'
+SET assignee_user_id='10000000-0000-4000-8000-000000000002'
 WHERE id=current_setting('kasbeman.test_primary_ticket_id')::uuid;
 UPDATE public.tickets
 SET status='closed'
