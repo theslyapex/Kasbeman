@@ -379,19 +379,38 @@ $$;
 
 -- The canonical owner assignment must be business-wide, not branch-scoped.
 DO $$
+DECLARE
+  v_business_id uuid := current_setting('kasbeman.test_business_id')::uuid;
+  v_transfer_role_id uuid;
 BEGIN
   BEGIN
+    -- Add a temporary business-wide transfer permission first, while the
+    -- original owner grant is still valid, so the function reaches its
+    -- ownership-state validation after the owner grant becomes branch-scoped.
+    INSERT INTO public.roles (business_id, role_key, name, is_system, status, created_by)
+    VALUES (v_business_id, 'transfer_test', 'Transfer Test', false, 'active', auth.uid())
+    RETURNING id INTO v_transfer_role_id;
+
+    INSERT INTO public.role_permissions (business_id, role_id, permission_key)
+    VALUES
+      (v_business_id, v_transfer_role_id, 'team.roles.assign'),
+      (v_business_id, v_transfer_role_id, 'business.ownership.transfer');
+
+    INSERT INTO public.member_role_assignments (
+      business_id, user_id, role_id, branch_id, status, assigned_by
+    ) VALUES (
+      v_business_id, auth.uid(), v_transfer_role_id, null, 'active', auth.uid()
+    );
+
     UPDATE public.member_role_assignments mra
     SET branch_id = (
-      SELECT b.id
-      FROM public.branches b
-      WHERE b.business_id = mra.business_id
-        AND b.is_primary
+      SELECT b.id FROM public.branches b
+      WHERE b.business_id = mra.business_id AND b.is_primary
       LIMIT 1
     )
     FROM public.roles r
-    WHERE mra.business_id = current_setting('kasbeman.test_business_id')::uuid
-      AND mra.user_id = '10000000-0000-4000-8000-000000000001'
+    WHERE mra.business_id = v_business_id
+      AND mra.user_id = auth.uid()
       AND mra.status = 'active'
       AND r.business_id = mra.business_id
       AND r.id = mra.role_id
@@ -399,7 +418,7 @@ BEGIN
       AND r.is_system;
 
     PERFORM public.transfer_business_ownership(
-      current_setting('kasbeman.test_business_id')::uuid,
+      v_business_id,
       '10000000-0000-4000-8000-000000000004'
     );
     RAISE EXCEPTION 'Transfer accepted a branch-scoped owner assignment';
@@ -407,7 +426,6 @@ BEGIN
   END;
 END
 $$;
-
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 
