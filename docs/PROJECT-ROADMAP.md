@@ -11,7 +11,7 @@
 | کل محصول نسبت به دامنه توافق‌شده | **۲۷٪** | در حال توسعه؛ هسته تیکت در وب/موبایل و آزمون‌های امنیتی آن تکمیل CI شده، اما انتشار و اتصال E2E باقی است |
 | وب‌اپلیکیشن Next.js | **۲۱٪** | جریان حساب/فضای کاری، مرکز تیکت و بیلد Production موفق CI |
 | اپلیکیشن Flutter | **۳۴٪** | جریان حساب/فضای کاری، ماژول‌های عملیاتی و مرکز تیکت؛ analyze، تست و Android Debug CI موفق |
-| بک‌اند و دیتابیس Supabase | **۳۱٪** | هویت و RBAC روی پروژه اصلی ثبت شده؛ طرح تیکت و آزمون‌های امنیتی/چنداتصالی روی PostgreSQL 17 CI موفق؛ طرح تیکت و فروش/انبار هنوز روی پروژه اصلی اعمال نشده |
+| بک‌اند و دیتابیس Supabase | **۳۲٪** | CRM مشتریان از فروش/انبار جدا و در PostgreSQL 17 با آزمون‌های مجوز، tenant isolation و concurrency تأیید شده؛ هنوز روی پروژه اصلی اعمال نشده |
 | استقرار و نسخه قابل تست عمومی | **۰٪** | هنوز مستقر نشده |
 
 این درصدها تخمین مدیریتی از کل محصول هستند، نه درصد تست موفق یا شمارش خطوط کد. کدهای آماده‌ای که به دیتابیس اعمال‌نشده وابسته‌اند، «تکمیل عملیاتی» محسوب نمی‌شوند.
@@ -46,6 +46,7 @@
 
 ### فاز ۳ — هسته عملیاتی کسب‌وکار
 - [x] بخش‌هایی از مدیریت مشتریان
+- [x] جداسازی هسته مستقل مشتریان CRM از طرح فروش/انبار و آزمون مستقل مجوزهای مشاهده/ایجاد/ویرایش/بایگانی
 - [x] بخش‌هایی از فروش و فاکتور
 - [x] بخش‌هایی از انبار و گردش موجودی
 - [x] خروجی صورت‌حساب مشتری PDF و Excel در موبایل
@@ -63,7 +64,7 @@
 - [ ] آزمون end-to-end با پروژه Supabase آزمایشی واقعی و کلاینت‌های وب/موبایل
 - [ ] تکمیل دفتر حساب‌ها، اسناد و گزارش‌های حسابداری
 - [ ] تکمیل اتصال رابط‌های وب و موبایل به انبارهای چندگانه و انتقال بین انبارها
-- وضعیت: **هسته فروش/انبار بخشی از پیاده‌سازی است؛ مرکز تیکت در وب و Flutter پیاده‌سازی شده و طرح امنیتی تیکت، audit و آزمون‌های tenant/branch/permission/concurrency در PostgreSQL 17 CI موفق‌اند. اتصال E2E و migration عملیاتی هنوز باقی است.**
+- وضعیت: **هسته مستقل CRM مشتریان و آزمون‌های مجوز آن در PostgreSQL 17 CI موفق‌اند؛ هسته فروش/انبار بخشی از پیاده‌سازی است؛ مرکز تیکت در وب و Flutter پیاده‌سازی شده و طرح امنیتی تیکت، audit و آزمون‌های tenant/branch/permission/concurrency نیز موفق‌اند. اتصال E2E و migration عملیاتی هنوز باقی است.**
 
 ### فاز ۴ — وب‌اپلیکیشن و پنل‌های مدیریتی
 - [x] صفحه معرفی اولیه
@@ -100,6 +101,7 @@
 
 ### فاز ۷ — کیفیت، استقرار و عرضه
 - [x] CI وب و دیتابیس: PostgreSQL 17، tenant/RLS/RBAC، آزمون چنداتصالی، TypeScript، ESLint و Production build موفق برای commit `2d3dd8c` ([run](https://github.com/theslyapex/Kasbeman/actions/runs/46142375026))
+- [x] CI وب/دیتابیس برای CRM مستقل: آزمون CRM، فروش/انبار، تیکت، جداسازی tenant، concurrency، vinext، TypeScript، ESLint و Production build موفق برای commit `59ec0eb25e85a982e371e9ff41eb58fcbae125f9` ([run](https://github.com/theslyapex/Kasbeman/actions/runs/46144849198))
 - [x] CI موبایل: Flutter analyze، تست‌ها و Android Debug build موفق برای commit `1392904` ([run](https://github.com/theslyapex/Kasbeman/actions/runs/46141005622))
 - [x] اجرای migrationهای پایه و پیش‌نویس هسته عملیاتی روی PostgreSQL 17 موقت در CI
 - [x] تست tenant isolation، RBAC سطح شعبه، فروش، انتقال موجودی، دریافت، برگشت، جلوگیری از عملیات تکراری و rollback
@@ -281,3 +283,14 @@
 - بازبینی read-only دیتابیس تولیدی نشان داد فقط ۹ جدول پایه هویت/RBAC/کسب‌وکار وجود دارد و جدول `customers` هنوز ایجاد نشده است. طرح تیکت به کلید خارجی مرکب `customers(business_id,id)` وابسته است و صفحه وب نیز مشتری‌ها را بارگیری می‌کند.
 - در نتیجه، تبدیل فوری طرح تیکت به migration مستقل قابل استقرار نیست؛ ابتدا باید طرح CRM/customer به migration canonical و آزمون‌شده تبدیل شود. سند `docs/TICKETING-ROLLOUT.md` وابستگی‌ها، ترتیب rollout و شروط تأیید را ثبت می‌کند.
 - هیچ SQL یا migration روی Supabase تولید اجرا نشده، شاخه `main` بدون تغییر است و درصد پیشرفت پروژه در این مرحله تغییر نمی‌کند.
+
+
+## جداسازی و آزمون مستقل هسته CRM مشتریان (۲۰۲۶-۱۱-۲۸)
+
+- جدول `public.customers`، کلید یکتای مرکب `(business_id, id)`، ایندکس‌های جست‌وجو، RLS و trigger کنترل تغییر وضعیت از `supabase/drafts/sales_inventory_core.sql` جدا و در `supabase/drafts/crm_core.sql` قرار گرفت.
+- مجوزهای عملیات تفکیک شده‌اند: مشاهده با `crm.customers.read`، ایجاد با `crm.customers.create`، ویرایش پروفایل با `crm.customers.update` و بایگانی/بازگردانی با `crm.customers.delete`. مجوز حذف مستقیم به نقش API داده نشده است.
+- آزمون مستقل `supabase/tests/crm-customer-smoke.sql` برای جداسازی tenant، نقش فقط‌خواندنی، نقش فقط‌سازنده، ویرایش بدون مجوز بایگانی، بایگانی توسط مالک، RLS و ACL تابع trigger اضافه شد.
+- `scripts/check-crm-security.mjs` نیز کنترل ایستای جداسازی schema، سیاست‌ها، کلید tenant و مجوز trigger را اجرا می‌کند.
+- اسکریپت PostgreSQL ابتدا CRM را قبل از فروش/انبار و تیکت اعمال آزمایشی می‌کند؛ آزمون CRM پس از ساخت fixtureهای پایه اجرا می‌شود.
+- CI کامل برای commit `59ec0eb25e85a982e371e9ff41eb58fcbae125f9` موفق شد: PostgreSQL 17 schema/tenant tests، concurrency چنداتصالی، vinext، TypeScript، ESLint و Production build ([اجرای موفق CI](https://github.com/theslyapex/Kasbeman/actions/runs/46144849198)).
+- این موفقیت فقط در PostgreSQL موقت CI است. هنوز migration canonical برای CRM ساخته یا روی Supabase تولید اجرا نشده؛ هیچ SQL تولیدی اجرا نشده و شاخه `main` بدون تغییر است. برای rollout باید migration مستقل با Supabase CLI ساخته، در برابر baseline پروژه و محیط staging بررسی و سپس با تأیید صریح جداگانه اعمال شود.
