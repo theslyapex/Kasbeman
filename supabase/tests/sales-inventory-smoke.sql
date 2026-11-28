@@ -694,7 +694,7 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
 END
-$$;
+$permission_enforcement_test$;
 
 RESET ROLE;
 SET ROLE authenticated;
