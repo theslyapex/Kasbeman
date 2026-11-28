@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../inventory/inventory_screen.dart';
+import '../team/team_screen.dart';
 import '../workspace/branch_selection_store.dart';
 import '../workspace/create_branch_screen.dart';
 import '../workspace/workspace_repository.dart';
@@ -371,6 +372,28 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
+                  if (result.permissions.contains('team.members.read') ||
+                      result.permissions.contains('team.members.invite') ||
+                      result.permissions.contains('business.ownership.transfer')) ...[
+                    const SizedBox(height: 14),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => TeamScreen(
+                                membership: widget.membership,
+                                permissions: result.permissions,
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.groups_outlined),
+                          label: const Text('مدیریت اعضا و دعوت‌ها'),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   Card(
                     child: Padding(
