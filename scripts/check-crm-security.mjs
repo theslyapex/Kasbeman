@@ -2,7 +2,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
 const migrationNames = (await readdir("supabase/migrations"))
-  .filter((name) => /^\\d+_crm_customer_core\\.sql$/.test(name));
+  .filter((name) => /^\d+_crm_customer_core\.sql$/.test(name));
 if (migrationNames.length !== 1) {
   console.error(`Expected exactly one canonical CRM migration, found ${migrationNames.length}.`);
   process.exit(1);
