@@ -67,6 +67,7 @@ DECLARE
     'private.log_authorization_change()',
     'private.guard_business_member_lifecycle()',
     'private.guard_owner_role_assignment()',
+    'private.guard_customer_status_permission()',
     'private.consume_operation_rate_limit(text,uuid)'
   ];
 BEGIN
@@ -282,6 +283,44 @@ VALUES (
   auth.uid()
 );
 
+-- A customer editor may update profile fields, but cannot archive or restore records.
+INSERT INTO public.roles (business_id, role_key, name, description, is_system, created_by)
+VALUES (:'business_id'::uuid, 'customer-editor', 'ویرایشگر مشتریان',
+        'Can edit CRM profile fields but cannot archive customers', false, auth.uid())
+RETURNING id AS customer_editor_role_id \gset
+INSERT INTO public.role_permissions (business_id, role_id, permission_key)
+VALUES
+  (:'business_id'::uuid, :'customer_editor_role_id'::uuid, 'crm.customers.read'),
+  (:'business_id'::uuid, :'customer_editor_role_id'::uuid, 'crm.customers.update');
+INSERT INTO public.member_role_assignments
+  (business_id, user_id, role_id, branch_id, status, assigned_by)
+VALUES (
+  :'business_id'::uuid,
+  '10000000-0000-4000-8000-000000000004',
+  :'customer_editor_role_id'::uuid,
+  NULL,
+  'active',
+  auth.uid()
+);
+
+-- Sales read-only access must not imply draft editing, confirmation, or deletion.
+INSERT INTO public.roles (business_id, role_key, name, description, is_system, created_by)
+VALUES (:'business_id'::uuid, 'sales-reader', 'مشاهده‌گر فروش',
+        'Read-only sales access for CI', false, auth.uid())
+RETURNING id AS sales_reader_role_id \gset
+INSERT INTO public.role_permissions (business_id, role_id, permission_key)
+VALUES (:'business_id'::uuid, :'sales_reader_role_id'::uuid, 'sales.invoices.read');
+INSERT INTO public.member_role_assignments
+  (business_id, user_id, role_id, branch_id, status, assigned_by)
+VALUES (
+  :'business_id'::uuid,
+  '10000000-0000-4000-8000-000000000004',
+  :'sales_reader_role_id'::uuid,
+  NULL,
+  'active',
+  auth.uid()
+);
+
 -- A limited role assigner may delegate only permissions they personally hold.
 INSERT INTO public.roles (business_id, role_key, name, description, is_system, created_by)
 VALUES (:'business_id'::uuid, 'limited-role-assigner', 'تخصیص‌دهنده محدود',
@@ -317,6 +356,7 @@ SELECT set_config('kasbeman.test_warehouse_id', :'warehouse_id', false);
 SELECT set_config('kasbeman.test_second_branch_id', :'second_branch_id', false);
 SELECT set_config('kasbeman.test_second_warehouse_id', :'second_warehouse_id', false);
 SELECT set_config('kasbeman.test_product_id', :'product_id', false);
+SELECT set_config('kasbeman.test_customer_id', :'customer_id', false);
 
 DO $$
 BEGIN
@@ -607,10 +647,17 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.customers WHERE name = 'مشتری آزمایشی') THEN
     RAISE EXCEPTION 'crm.customers.read did not grant customer visibility';
   END IF;
-END
-$$;
 
-DO $$
+  UPDATE public.customers
+  SET name = 'ویرایش غیرمجاز توسط مشاهده‌گر'
+  WHERE id = current_setting('kasbeman.test_customer_id')::uuid;
+  IF FOUND THEN
+    RAISE EXCEPTION 'CRM read-only role unexpectedly updated a customer';
+  END IF;
+END
+$;
+
+DO $
 BEGIN
   BEGIN
     INSERT INTO public.customers (business_id, name, created_by)
@@ -648,6 +695,57 @@ BEGIN
   END;
 END
 $$;
+
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000004';
+
+DO $
+BEGIN
+  UPDATE public.customers
+  SET name = 'مشتری ویرایش‌شده توسط ویرایشگر'
+  WHERE id = current_setting('kasbeman.test_customer_id')::uuid;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Customer editor could not update allowed profile fields';
+  END IF;
+
+  BEGIN
+    UPDATE public.customers SET status = 'archived'
+    WHERE id = current_setting('kasbeman.test_customer_id')::uuid;
+    RAISE EXCEPTION 'Customer editor archived a customer without delete permission';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  IF (SELECT status FROM public.customers
+      WHERE id = current_setting('kasbeman.test_customer_id')::uuid) <> 'active' THEN
+    RAISE EXCEPTION 'Denied customer archive changed the persisted status';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM public.sales) THEN
+    RAISE EXCEPTION 'sales.invoices.read did not grant sales visibility';
+  END IF;
+
+  UPDATE public.sales SET notes = 'unauthorized draft edit'
+  WHERE id = current_setting('kasbeman.test_insufficient_sale_id')::uuid;
+  IF FOUND THEN
+    RAISE EXCEPTION 'Sales read-only role unexpectedly updated a draft sale';
+  END IF;
+
+  BEGIN
+    DELETE FROM public.sales
+    WHERE id = current_setting('kasbeman.test_insufficient_sale_id')::uuid;
+    RAISE EXCEPTION 'Sales read-only role unexpectedly deleted a sale';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+
+  BEGIN
+    PERFORM public.confirm_sale(
+      current_setting('kasbeman.test_insufficient_sale_id')::uuid
+    );
+    RAISE EXCEPTION 'Sales read-only role unexpectedly confirmed a sale';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+END
+$;
 
 RESET ROLE;
 SET ROLE authenticated;
