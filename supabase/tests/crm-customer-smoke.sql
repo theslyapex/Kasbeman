@@ -37,7 +37,7 @@ VALUES
   :'crm_reader_role_id'::uuid, NULL, 'active', auth.uid()),
  (:'business_id'::uuid, '10000000-0000-4000-8000-000000000004',
   :'crm_editor_role_id'::uuid, NULL, 'active', auth.uid()),
- (:'business_id'::uuid, '10000000-0000-4000-8000-000000000005',
+ (:'business_id'::uuid, '10000000-0000-4000-8000-000000000002',
   :'crm_creator_role_id'::uuid, NULL, 'active', auth.uid());
 
 -- Reader can see customers but cannot change or create them.
@@ -98,7 +98,10 @@ $crm_editor_archive_guard$;
 -- Creator can insert but is not granted customer read or update privileges.
 RESET ROLE;
 SET ROLE authenticated;
-SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000005';
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
+UPDATE public.member_role_assignments SET status='revoked', revoked_at=now()
+WHERE business_id=:'business_id'::uuid AND user_id=auth.uid()
+  AND role_id=:'crm_reader_role_id'::uuid AND status='active';
 INSERT INTO public.customers (business_id, name, created_by)
 VALUES (current_setting('kasbeman.test_business_id')::uuid,
         'مشتری ایجادشده توسط نقش محدود', auth.uid())
@@ -116,6 +119,8 @@ END
 $crm_creator_scope$;
 
 -- A user from another tenant cannot read this tenant's customer.
+RESET ROLE;
+SET ROLE authenticated;
 RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000003';
