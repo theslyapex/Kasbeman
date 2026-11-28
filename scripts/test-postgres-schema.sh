@@ -13,6 +13,7 @@ psql -v ON_ERROR_STOP=1 \
   -f supabase/drafts/sales_inventory_core.sql \
   -f supabase/drafts/ticketing_core.sql \
   -f supabase/tests/sales-inventory-smoke.sql \
+  -f supabase/tests/crm-customer-smoke.sql \
   -f supabase/tests/ticketing-smoke.sql \
   -f supabase/tests/business-creation-rate-limit-smoke.sql \
   -f supabase/tests/membership-invitation-smoke.sql \
