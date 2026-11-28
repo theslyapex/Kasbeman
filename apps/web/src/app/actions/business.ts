@@ -28,7 +28,7 @@ export async function createBusinessAction(
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) redirect("/login");
 
-  const { error } = await supabase.rpc("create_business", {
+  const { data, error } = await supabase.rpc("create_business", {
     p_name: parsed.data.name,
     p_slug: parsed.data.slug,
   });
@@ -38,6 +38,9 @@ export async function createBusinessAction(
   }
   if (error) {
     return { error: "ساخت کسب‌وکار انجام نشد. اطلاعات را بررسی و دوباره تلاش کنید." };
+  }
+  if (data === null) {
+    return { error: "در مدت کوتاهی چند کسب‌وکار ساخته‌اید. لطفاً حدود ۱۰ دقیقه دیگر دوباره تلاش کنید." };
   }
 
   redirect("/dashboard?created=1");
