@@ -34,8 +34,11 @@ VALUES (:'business_id'::uuid, 'ticket-blind-assigner', 'تخصیص‌دهنده 
 RETURNING id AS ticket_blind_assigner_role_id \gset
 INSERT INTO public.role_permissions (business_id, role_id, permission_key)
 VALUES (:'business_id'::uuid, :'ticket_blind_assigner_role_id'::uuid, 'tickets.assign');
+RESET ROLE;
 INSERT INTO public.business_members (business_id,user_id,role_key,status)
 VALUES (:'business_id'::uuid,'10000000-0000-4000-8000-000000000005','member','active');
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 INSERT INTO public.member_role_assignments
  (business_id,user_id,role_id,branch_id,status,assigned_by)
 VALUES
