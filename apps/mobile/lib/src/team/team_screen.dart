@@ -51,7 +51,8 @@ class _TeamScreenState extends State<TeamScreen> {
               .eq('status', 'active')
               .order('name')
           : <Map<String, dynamic>>[];
-      final branches = _canAssignRoles
+      final branches = (_canAssignRoles || _canManageMembers ||
+              widget.permissions.contains('team.members.read'))
           ? await _client.from('branches')
               .select('id,name,is_primary')
               .eq('business_id', _businessId)
