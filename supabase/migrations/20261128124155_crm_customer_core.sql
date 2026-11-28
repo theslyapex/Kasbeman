@@ -1,7 +1,6 @@
--- Kasbeman CRM core — REVIEW DRAFT
--- Customer foundation is intentionally separate from sales/inventory and ticketing.
--- Generate a canonical migration with Supabase CLI only after review.
--- Do not apply this draft to production as-is.
+-- Kasbeman CRM customer core — canonical migration
+-- Generated with Supabase CLI 3.4.0 from the reviewed CRM draft.
+-- Production rollout remains gated by staging verification and explicit approval.
 
 begin;
 
