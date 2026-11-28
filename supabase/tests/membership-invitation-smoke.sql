@@ -329,7 +329,7 @@ $$;
 
 -- A second active owner assignment on another active member must block transfer.
 RESET ROLE;
-DO $
+DO $$
 BEGIN
   BEGIN
     INSERT INTO public.member_role_assignments (
@@ -354,11 +354,11 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL;
   END;
 END
-$;
+$$;
 
 -- An active legacy owner membership without a matching owner assignment must
 -- also make the ownership state inconsistent and block transfer.
-DO $
+DO $$
 BEGIN
   BEGIN
     UPDATE public.business_members
@@ -375,10 +375,10 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL;
   END;
 END
-$;
+$$;
 
 -- The canonical owner assignment must be business-wide, not branch-scoped.
-DO $
+DO $$
 BEGIN
   BEGIN
     UPDATE public.member_role_assignments mra
@@ -406,7 +406,7 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL;
   END;
 END
-$;
+$$;
 
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
