@@ -59,7 +59,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_role_key text;
 begin
@@ -85,7 +85,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 
 revoke all on function private.guard_owner_role_assignment()
   from public, anon, authenticated;
@@ -107,7 +107,7 @@ returns uuid
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_actor_id uuid := (select auth.uid());
   v_business_id uuid;
@@ -245,7 +245,7 @@ begin
 
   return p_new_owner_user_id;
 end;
-$;
+$$;
 
 revoke all on function public.transfer_business_ownership(uuid, uuid)
   from public, anon;
