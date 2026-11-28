@@ -230,7 +230,8 @@ RETURNING id AS branch_reader_role_id \gset
 INSERT INTO public.role_permissions (business_id, role_id, permission_key)
 VALUES
   (:'business_id'::uuid, :'branch_reader_role_id'::uuid, 'inventory.stock.read'),
-  (:'business_id'::uuid, :'branch_reader_role_id'::uuid, 'inventory.items.read');
+  (:'business_id'::uuid, :'branch_reader_role_id'::uuid, 'inventory.items.read'),
+  (:'business_id'::uuid, :'branch_reader_role_id'::uuid, 'inventory.warehouses.read');
 
 INSERT INTO public.member_role_assignments
   (business_id, user_id, role_id, branch_id, status, assigned_by)
@@ -636,6 +637,43 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.stock_balances
       WHERE warehouse_id = current_setting('kasbeman.test_warehouse_id')::uuid) THEN
     RAISE EXCEPTION 'Branch-scoped stock reader can see stock from an unassigned branch';
+  END IF;
+  IF (SELECT count(*) FROM public.warehouses
+      WHERE branch_id = current_setting('kasbeman.test_second_branch_id')::uuid) <> 1 THEN
+    RAISE EXCEPTION 'Branch-scoped warehouse reader cannot see the assigned branch warehouse';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.warehouses
+      WHERE branch_id = current_setting('kasbeman.test_branch_id')::uuid) THEN
+    RAISE EXCEPTION 'Branch-scoped warehouse reader can see an unassigned branch warehouse';
+  END IF;
+  UPDATE public.warehouses
+  SET name = 'تغییر غیرمجاز مشاهده‌گر'
+  WHERE id = current_setting('kasbeman.test_second_warehouse_id')::uuid;
+  IF FOUND THEN
+    RAISE EXCEPTION 'Warehouse read-only role unexpectedly updated a warehouse';
+  END IF;
+  BEGIN
+    INSERT INTO public.warehouses
+      (business_id, branch_id, name, code, created_by)
+    VALUES (
+      current_setting('kasbeman.test_business_id')::uuid,
+      current_setting('kasbeman.test_second_branch_id')::uuid,
+      'انبار غیرمجاز', 'DENIED-WH', auth.uid()
+    );
+    RAISE EXCEPTION 'Warehouse read-only role unexpectedly created a warehouse';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  IF has_table_privilege('authenticated', 'public.stock_movements', 'UPDATE')
+     OR has_table_privilege('authenticated', 'public.stock_movements', 'DELETE') THEN
+    RAISE EXCEPTION 'Stock movements must not be directly mutable or deletable through the API';
+  END IF;
+  IF has_table_privilege('authenticated', 'public.customer_receipts', 'INSERT')
+     OR has_table_privilege('authenticated', 'public.customer_receipts', 'UPDATE')
+     OR has_table_privilege('authenticated', 'public.customer_receipts', 'DELETE') THEN
+    RAISE EXCEPTION 'Customer receipts must be created/reversed only through secured RPCs';
+  END IF;
+  IF has_table_privilege('authenticated', 'public.sales', 'DELETE') THEN
+    RAISE EXCEPTION 'Sales must not be directly deletable through the API';
   END IF;
   IF EXISTS (SELECT 1 FROM public.sales) THEN
     RAISE EXCEPTION 'Member without sales.invoices.read can see sales';
