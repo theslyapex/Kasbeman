@@ -736,4 +736,71 @@ BEGIN
 END
 $$;
 
+-- Role assignment requires the dedicated permission and cannot grant
+-- permissions the acting administrator does not hold.
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000004';
+
+SELECT id AS sales_role_id
+FROM public.roles
+WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
+  AND role_key = 'custom_sales_ops'
+  AND status = 'active' \gset
+
+INSERT INTO public.member_role_assignments (
+  business_id, user_id, role_id, branch_id, status, assigned_by
+) VALUES (
+  current_setting('kasbeman.test_business_id')::uuid,
+  '10000000-0000-4000-8000-000000000005'::uuid,
+  :'sales_role_id'::uuid,
+  null, 'active', auth.uid()
+);
+
+INSERT INTO public.roles (
+  business_id, role_key, name, description, is_system, created_by
+) VALUES (
+  current_setting('kasbeman.test_business_id')::uuid,
+  'custom_privileged_test', 'Privileged Test', 'Test-only elevated permission',
+  false, auth.uid()
+) RETURNING id AS privileged_role_id \gset
+
+INSERT INTO public.role_permissions (business_id, role_id, permission_key)
+VALUES (
+  current_setting('kasbeman.test_business_id')::uuid,
+  :'privileged_role_id'::uuid,
+  'business.delete'
+);
+
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
+
+DO $role_assignment_escalation_test$
+DECLARE
+  v_business_id uuid := current_setting('kasbeman.test_business_id')::uuid;
+  v_privileged_role_id uuid := :'privileged_role_id'::uuid;
+BEGIN
+  IF NOT private.has_business_permission(v_business_id, 'team.roles.assign', null) THEN
+    RAISE EXCEPTION 'Former owner admin should retain team.roles.assign for this test';
+  END IF;
+  IF private.has_business_permission(v_business_id, 'business.delete', null) THEN
+    RAISE EXCEPTION 'Former owner admin unexpectedly retained business.delete';
+  END IF;
+
+  BEGIN
+    INSERT INTO public.member_role_assignments (
+      business_id, user_id, role_id, branch_id, status, assigned_by
+    ) VALUES (
+      v_business_id,
+      '10000000-0000-4000-8000-000000000005'::uuid,
+      v_privileged_role_id,
+      null, 'active', auth.uid()
+    );
+    RAISE EXCEPTION 'Admin assigned a role containing a permission they do not hold';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+END
+$role_assignment_escalation_test$;
+
 SELECT 'Membership lifecycle and invitation hardening checks passed.' AS result;
