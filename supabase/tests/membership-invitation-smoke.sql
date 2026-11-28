@@ -27,6 +27,13 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Authenticated role can read invitation token hashes';
   END IF;
+  IF has_column_privilege(
+    'authenticated', 'public.business_invitations', 'status', 'UPDATE'
+  ) OR has_column_privilege(
+    'authenticated', 'public.business_invitations', 'email', 'UPDATE'
+  ) THEN
+    RAISE EXCEPTION 'Authenticated role can directly mutate invitation state';
+  END IF;
 
   BEGIN
     UPDATE public.business_invitations
