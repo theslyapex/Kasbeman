@@ -1,7 +1,7 @@
--- Kasbeman ticketing module — SECURITY REVIEW DRAFT
--- NOT a production migration. Validate against the exact base schema in disposable PostgreSQL first.
--- Dependencies: businesses, branches, business_members, customers, roles, permissions,
--- role_permissions, auth.users, auth.uid(), and private.has_business_permission(uuid,text,uuid).
+-- Kasbeman ticketing core — canonical migration
+-- Generated with Supabase CLI 3.4.0 from the reviewed ticketing draft.
+-- Depends on the CRM customer migration and existing identity/RBAC foundation.
+-- Production rollout remains gated by staging verification and explicit approval.
 
 begin;
 
