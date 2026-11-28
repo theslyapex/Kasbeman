@@ -382,3 +382,12 @@ BEGIN
  END IF;
 END
 $ticket_default_roles$;
+
+-- Release the temporary blind-assigner fixture so the following invitation
+-- smoke test can use the same auth identity as a pending invitee.
+RESET ROLE;
+UPDATE public.business_members
+SET status='revoked'
+WHERE business_id=current_setting('kasbeman.test_business_id')::uuid
+  AND user_id='10000000-0000-4000-8000-000000000005'
+  AND status='active';
