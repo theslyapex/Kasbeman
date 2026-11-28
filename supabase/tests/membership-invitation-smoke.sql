@@ -282,6 +282,49 @@ END
 $$;
 
 
+-- A legacy owner marker must remain protected even if its canonical RBAC
+-- owner assignment is missing or inconsistent.
+RESET ROLE;
+UPDATE public.business_members
+SET role_key = 'owner'
+WHERE business_id = :'business_id'::uuid
+  AND user_id = '10000000-0000-4000-8000-000000000002'
+  AND status = 'active';
+
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
+DO $
+BEGIN
+  IF private.can_manage_business_member(
+    current_setting('kasbeman.test_business_id')::uuid,
+    '10000000-0000-4000-8000-000000000002'::uuid
+  ) THEN
+    RAISE EXCEPTION 'Legacy owner was considered manageable';
+  END IF;
+END
+$;
+
+RESET ROLE;
+DO $
+BEGIN
+  BEGIN
+    UPDATE public.business_members
+    SET status = 'suspended'
+    WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
+      AND user_id = '10000000-0000-4000-8000-000000000002';
+    RAISE EXCEPTION 'Legacy owner membership was suspended';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+END
+$;
+
+UPDATE public.business_members
+SET role_key = 'member'
+WHERE business_id = :'business_id'::uuid
+  AND user_id = '10000000-0000-4000-8000-000000000002'
+  AND status = 'active';
+
+
 -- Only the current sole owner may transfer ownership, and the target must be
 -- an already-active member. The transfer is atomic across membership + RBAC.
 RESET ROLE;
