@@ -230,8 +230,27 @@ $$;
 -- The trigger is a second line of defence even against privileged SQL paths:
 -- an owner must use a dedicated ownership-transfer flow, never member suspension.
 RESET ROLE;
-DO $$
+DO $
+DECLARE
+  v_owner_role_assignment_id uuid;
 BEGIN
+  SELECT mra.id INTO v_owner_role_assignment_id
+  FROM public.member_role_assignments mra
+  JOIN public.roles r
+    ON r.business_id = mra.business_id AND r.id = mra.role_id
+  WHERE mra.business_id = current_setting('kasbeman.test_business_id')::uuid
+    AND mra.user_id = '10000000-0000-4000-8000-000000000001'
+    AND mra.status = 'active'
+    AND r.role_key = 'owner';
+
+  BEGIN
+    UPDATE public.member_role_assignments
+    SET status = 'revoked', revoked_at = now()
+    WHERE id = v_owner_role_assignment_id;
+    RAISE EXCEPTION 'Owner role assignment was revoked';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
   BEGIN
     UPDATE public.business_members
     SET status = 'suspended'
@@ -241,6 +260,6 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL;
   END;
 END
-$$;
+$;
 
 SELECT 'Membership lifecycle and invitation hardening checks passed.' AS result;
