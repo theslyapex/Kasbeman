@@ -829,7 +829,7 @@ INSERT INTO public.roles (
   current_setting('kasbeman.test_business_id')::uuid,
   'custom_branch_scope_test', 'Branch Scope Test',
   'Test-only branch-scoped permission', false, auth.uid()
-) RETURNING id AS branch_scope_role_id \\gset
+) RETURNING id AS branch_scope_role_id \gset
 SELECT set_config('kasbeman.test_branch_scope_role_id', :'branch_scope_role_id', false);
 
 INSERT INTO public.role_permissions (business_id, role_id, permission_key)
