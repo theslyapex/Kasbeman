@@ -627,7 +627,7 @@ BEGIN
 END
 $$;
 
-DO $$
+DO $permission_enforcement_test$
 BEGIN
   IF (SELECT count(*) FROM public.stock_balances
       WHERE warehouse_id = current_setting('kasbeman.test_second_warehouse_id')::uuid) <> 1 THEN
