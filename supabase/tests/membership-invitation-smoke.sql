@@ -274,4 +274,139 @@ BEGIN
 END
 $$;
 
+
+-- Only the current sole owner may transfer ownership, and the target must be
+-- an already-active member. The transfer is atomic across membership + RBAC.
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
+
+DO $
+BEGIN
+  BEGIN
+    PERFORM public.transfer_business_ownership(
+      current_setting('kasbeman.test_business_id')::uuid,
+      '10000000-0000-4000-8000-000000000004'
+    );
+    RAISE EXCEPTION 'Suspended non-owner transferred business ownership';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+END
+$;
+
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
+
+DO $
+BEGIN
+  BEGIN
+    PERFORM public.transfer_business_ownership(
+      current_setting('kasbeman.test_business_id')::uuid,
+      '10000000-0000-4000-8000-000000000002'
+    );
+    RAISE EXCEPTION 'Ownership was transferred to a suspended member';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+END
+$;
+
+SELECT public.transfer_business_ownership(
+  current_setting('kasbeman.test_business_id')::uuid,
+  '10000000-0000-4000-8000-000000000004'
+) AS transferred_owner_id \gset
+SELECT set_config('kasbeman.test_transferred_owner_id', :'transferred_owner_id', false);
+
+DO $
+DECLARE
+  v_business_id uuid := current_setting('kasbeman.test_business_id')::uuid;
+  v_new_owner_id uuid := current_setting('kasbeman.test_transferred_owner_id')::uuid;
+  v_old_owner_id uuid := '10000000-0000-4000-8000-000000000001';
+BEGIN
+  IF v_new_owner_id <> '10000000-0000-4000-8000-000000000004'::uuid THEN
+    RAISE EXCEPTION 'Ownership transfer returned the wrong owner';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.business_members
+    WHERE business_id = v_business_id
+      AND user_id = v_new_owner_id
+      AND status = 'active'
+      AND role_key = 'owner'
+  ) THEN
+    RAISE EXCEPTION 'New owner membership was not updated';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.business_members
+    WHERE business_id = v_business_id
+      AND user_id = v_old_owner_id
+      AND status = 'active'
+      AND role_key = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Previous owner was not retained as an active admin';
+  END IF;
+
+  IF (
+    SELECT count(*)
+    FROM public.member_role_assignments mra
+    JOIN public.roles r
+      ON r.business_id = mra.business_id AND r.id = mra.role_id
+    WHERE mra.business_id = v_business_id
+      AND mra.status = 'active'
+      AND r.role_key = 'owner'
+  ) <> 1 THEN
+    RAISE EXCEPTION 'Transfer did not preserve exactly one active owner';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.member_role_assignments mra
+    JOIN public.roles r
+      ON r.business_id = mra.business_id AND r.id = mra.role_id
+    WHERE mra.business_id = v_business_id
+      AND mra.user_id = v_new_owner_id
+      AND mra.status = 'active'
+      AND r.role_key = 'owner'
+      AND mra.branch_id IS NULL
+  ) THEN
+    RAISE EXCEPTION 'New owner RBAC assignment is missing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.member_role_assignments mra
+    JOIN public.roles r
+      ON r.business_id = mra.business_id AND r.id = mra.role_id
+    WHERE mra.business_id = v_business_id
+      AND mra.user_id = v_old_owner_id
+      AND mra.status = 'active'
+      AND r.role_key = 'admin'
+      AND mra.branch_id IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Previous owner did not receive the admin role';
+  END IF;
+
+  IF private.has_business_permission(v_business_id, 'business.ownership.transfer', null) THEN
+    RAISE EXCEPTION 'Previous owner retained ownership transfer permission';
+  END IF;
+END
+$;
+
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000004';
+
+DO $
+BEGIN
+  IF NOT private.has_business_permission(
+    current_setting('kasbeman.test_business_id')::uuid,
+    'business.ownership.transfer',
+    null
+  ) THEN
+    RAISE EXCEPTION 'New owner did not receive ownership authority';
+  END IF;
+END
+$;
+
 SELECT 'Membership lifecycle and invitation hardening checks passed.' AS result;
