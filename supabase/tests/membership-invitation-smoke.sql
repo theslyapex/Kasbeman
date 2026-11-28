@@ -356,7 +356,7 @@ WHERE business_id = :'business_id'::uuid
 SELECT invitation_id AS reactivation_invite_id, invitation_token AS reactivation_invite_token
 FROM public.create_business_invitation(
   :'business_id'::uuid, 'invitee@kasbeman.test', 'member'
-) \\gset
+) \gset
 SELECT set_config('kasbeman.test_reactivation_token', :'reactivation_invite_token', false);
 
 RESET ROLE;
@@ -365,7 +365,7 @@ SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000005';
 
 SELECT public.accept_business_invitation(
   current_setting('kasbeman.test_reactivation_token')
-) AS reactivated_business_id \\gset
+) AS reactivated_business_id \gset
 
 DO $reactivation_check$
 BEGIN
