@@ -1,6 +1,28 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
 
-const crm = await readFile("supabase/drafts/crm_core.sql", "utf8");
+const migrationNames = (await readdir("supabase/migrations"))
+  .filter((name) => /^\\d+_crm_customer_core\\.sql$/.test(name));
+if (migrationNames.length !== 1) {
+  console.error(`Expected exactly one canonical CRM migration, found ${migrationNames.length}.`);
+  process.exit(1);
+}
+
+const crm = await readFile(join("supabase/migrations", migrationNames[0]), "utf8");
+const crmDraft = await readFile("supabase/drafts/crm_core.sql", "utf8");
+const sqlBody = (source) => {
+  const start = source.indexOf("begin;");
+  const end = source.lastIndexOf("commit;");
+  return start >= 0 && end > start ? source.slice(start, end + "commit;".length).trim() : "";
+};
+if (!sqlBody(crm) || sqlBody(crm) !== sqlBody(crmDraft)) {
+  console.error("Canonical CRM migration SQL does not match the reviewed draft.");
+  process.exit(1);
+}
+if (/REVIEW DRAFT/i.test(crm.slice(0, 500))) {
+  console.error("Canonical CRM migration still has a draft header.");
+  process.exit(1);
+}
 const sales = await readFile("supabase/drafts/sales_inventory_core.sql", "utf8");
 const failures = [];
 
