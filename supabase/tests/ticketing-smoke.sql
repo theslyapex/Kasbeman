@@ -42,7 +42,7 @@ INSERT INTO public.tickets
 VALUES
  (:'business_id'::uuid, :'branch_id'::uuid,'TK-CI-001','تیکت شعبه اصلی',
   'شرح اولیه برای آزمون امنیتی','normal',auth.uid(),:'customer_id'::uuid,auth.uid())
-RETURNING id AS primary_ticket_id \gset;
+RETURNING id AS primary_ticket_id \gset
 
 INSERT INTO public.tickets
  (business_id,branch_id,ticket_number,title,description,priority,
@@ -51,7 +51,7 @@ VALUES
  (:'business_id'::uuid, :'second_branch_id'::uuid,'TK-CI-002','تیکت شعبه دوم',
   'این تیکت نباید برای اپراتور شعبه اول دیده شود','high',
   auth.uid(),:'customer_id'::uuid,auth.uid())
-RETURNING id AS second_ticket_id \gset;
+RETURNING id AS second_ticket_id \gset
 
 INSERT INTO public.ticket_comments
  (business_id,ticket_id,author_user_id,body,visibility)
