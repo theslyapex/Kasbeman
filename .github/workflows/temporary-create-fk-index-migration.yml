@@ -97,7 +97,7 @@ jobs:
               JOIN pg_index ix ON ix.indexrelid = idx.oid
               JOIN pg_class tbl ON tbl.oid = ix.indrelid
               CROSS JOIN LATERAL (
-                SELECT array_agg(a.attname ORDER BY k.ord) AS columns
+                SELECT array_agg(a.attname::text ORDER BY k.ord) AS columns
                 FROM unnest(ix.indkey) WITH ORDINALITY AS k(attnum, ord)
                 JOIN pg_attribute a
                   ON a.attrelid = tbl.oid
