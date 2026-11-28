@@ -17,7 +17,17 @@ export default async function AcceptInvitationPage({
   }
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
-  if (!data.user) redirect("/login");
+  if (!data.user) {
+    return (
+      <main className="auth-shell">
+        <section className="auth-panel">
+          <h1 className="auth-title">ابتدا وارد حساب شو</h1>
+          <p className="auth-description">پس از ورود، به همین پیوند برگرد تا دعوت را با ایمیل تأییدشده حساب بپذیری. توکن دعوت در پیوند فعلی باقی می‌ماند.</p>
+          <Link className="form-submit" href="/login">ورود به حساب</Link>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="auth-shell">
