@@ -68,16 +68,21 @@ begin
   where r.business_id = old.business_id
     and r.id = old.role_id;
 
-  if old.status = 'active' and v_role_key = 'owner' then
-    if tg_op = 'DELETE' or new.status <> 'active' then
+  if tg_op = 'DELETE' then
+    if old.status = 'active' and v_role_key = 'owner' then
       raise exception 'Owner role assignment requires the dedicated ownership transfer flow'
         using errcode = '23514';
     end if;
-  end if;
-
-  if tg_op = 'DELETE' then
     return old;
   end if;
+
+  if old.status = 'active'
+     and v_role_key = 'owner'
+     and new.status <> 'active' then
+    raise exception 'Owner role assignment requires the dedicated ownership transfer flow'
+      using errcode = '23514';
+  end if;
+
   return new;
 end;
 $;
@@ -90,6 +95,162 @@ create trigger owner_role_assignment_guard
   before update of status or delete on public.member_role_assignments
   for each row
   execute function private.guard_owner_role_assignment();
+
+-- Atomic transfer: the previous owner becomes an admin, the target becomes
+-- the sole owner, and both legacy membership role_key and canonical RBAC
+-- assignments change in the same transaction.
+create or replace function public.transfer_business_ownership(
+  p_business_id uuid,
+  p_new_owner_user_id uuid
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_actor_id uuid := (select auth.uid());
+  v_business_id uuid;
+  v_owner_role_id uuid;
+  v_admin_role_id uuid;
+  v_owner_count integer;
+  v_actor_owner_count integer;
+begin
+  if v_actor_id is null then
+    raise exception 'Authentication required' using errcode = '28000';
+  end if;
+
+  if p_new_owner_user_id is null or p_new_owner_user_id = v_actor_id then
+    raise exception 'A different active member must receive ownership'
+      using errcode = '22023';
+  end if;
+
+  -- Serialize transfers for this tenant and prevent concurrent owner changes.
+  select b.id into v_business_id
+  from public.businesses b
+  where b.id = p_business_id
+    and b.status = 'active'
+  for update;
+
+  if v_business_id is null then
+    raise exception 'Business is unavailable' using errcode = '22023';
+  end if;
+
+  if not private.has_business_permission(
+    p_business_id, 'business.ownership.transfer', null
+  ) then
+    raise exception 'Ownership transfer permission required'
+      using errcode = '42501';
+  end if;
+
+  select count(*)::integer,
+         count(*) filter (where bm.user_id = v_actor_id)::integer
+  into v_owner_count, v_actor_owner_count
+  from public.business_members bm
+  join public.member_role_assignments mra
+    on mra.business_id = bm.business_id
+   and mra.user_id = bm.user_id
+   and mra.status = 'active'
+  join public.roles r
+    on r.business_id = mra.business_id
+   and r.id = mra.role_id
+   and r.role_key = 'owner'
+   and r.status = 'active'
+  where bm.business_id = p_business_id
+    and bm.status = 'active'
+    and bm.role_key = 'owner';
+
+  if v_owner_count <> 1 or v_actor_owner_count <> 1 then
+    raise exception 'Ownership state is inconsistent; contact support before transfer'
+      using errcode = '23514';
+  end if;
+
+  if not exists (
+    select 1
+    from public.business_members bm
+    where bm.business_id = p_business_id
+      and bm.user_id = p_new_owner_user_id
+      and bm.status = 'active'
+      and bm.role_key <> 'owner'
+  ) then
+    raise exception 'New owner must already be an active non-owner member'
+      using errcode = '23514';
+  end if;
+
+  select r.id into v_owner_role_id
+  from public.roles r
+  where r.business_id = p_business_id
+    and r.role_key = 'owner'
+    and r.is_system
+    and r.status = 'active';
+
+  select r.id into v_admin_role_id
+  from public.roles r
+  where r.business_id = p_business_id
+    and r.role_key = 'admin'
+    and r.is_system
+    and r.status = 'active';
+
+  if v_owner_role_id is null or v_admin_role_id is null then
+    raise exception 'Required system roles are unavailable'
+      using errcode = '23514';
+  end if;
+
+  -- Remove any additional grants from both parties before the role swap.
+  update public.member_role_assignments mra
+  set status = 'revoked',
+      revoked_at = coalesce(mra.revoked_at, now())
+  where mra.business_id = p_business_id
+    and mra.status = 'active'
+    and (
+      mra.user_id = p_new_owner_user_id
+      or (
+        mra.user_id = v_actor_id
+        and mra.role_id <> v_owner_role_id
+      )
+    );
+
+  -- The owner guard intentionally permits changing the protected owner
+  -- assignment's role_id; it forbids revocation/deletion outside this RPC.
+  update public.member_role_assignments
+  set role_id = v_admin_role_id
+  where business_id = p_business_id
+    and user_id = v_actor_id
+    and role_id = v_owner_role_id
+    and status = 'active';
+
+  if not found then
+    raise exception 'Current owner assignment could not be located'
+      using errcode = '23514';
+  end if;
+
+  update public.business_members
+  set role_key = 'admin'
+  where business_id = p_business_id
+    and user_id = v_actor_id
+    and status = 'active';
+
+  update public.business_members
+  set role_key = 'owner'
+  where business_id = p_business_id
+    and user_id = p_new_owner_user_id
+    and status = 'active';
+
+  insert into public.member_role_assignments (
+    business_id, user_id, role_id, branch_id, status, assigned_by
+  ) values (
+    p_business_id, p_new_owner_user_id, v_owner_role_id,
+    null, 'active', v_actor_id
+  );
+
+  return p_new_owner_user_id;
+end;
+$;
+
+revoke all on function public.transfer_business_ownership(uuid, uuid)
+  from public, anon;
+grant execute on function public.transfer_business_ownership(uuid, uuid)
+  to authenticated;
 
 -- A manager may not suspend a member whose active role grants permissions
 -- beyond the manager's own business-wide authority.
