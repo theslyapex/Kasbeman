@@ -373,6 +373,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   if (result.permissions.contains('team.members.read') ||
+                      result.permissions.contains('team.members.manage') ||
                       result.permissions.contains('team.members.invite') ||
                       result.permissions.contains('business.ownership.transfer')) ...[
                     const SizedBox(height: 14),
