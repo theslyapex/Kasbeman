@@ -1,3 +1,6 @@
+// The screen favors explicit string composition in compact Persian labels.
+// ignore_for_file: prefer_interpolation_to_compose_strings, curly_braces_in_flow_control_structures
+
 import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../workspace/workspace_repository.dart';
