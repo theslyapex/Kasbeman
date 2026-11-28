@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { signOutAction } from "@/app/actions/auth";
 import { MembersPanel } from "./members-panel";
+import { RolesPanel } from "./roles-panel";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +52,37 @@ export default async function BusinessMembersPage({
     : { data: [] as { permission_key: string }[] };
   const permissionKeys = new Set((rolePermissions ?? []).map((item) => item.permission_key));
 
+  const { data: roleRows, error: rolesError } = await supabase
+    .from("roles")
+    .select("id,role_key,name,description,is_system,status")
+    .eq("business_id", businessId)
+    .order("is_system", { ascending: false })
+    .order("name");
+  if (rolesError) throw new Error("دریافت نقش‌های کسب‌وکار انجام نشد.");
+
+  const roleIdsForBusiness = (roleRows ?? []).map((role) => role.id);
+  const { data: rolePermissionRows, error: rolePermissionError } = roleIdsForBusiness.length
+    ? await supabase.from("role_permissions")
+        .select("role_id,permission_key")
+        .eq("business_id", businessId)
+        .in("role_id", roleIdsForBusiness)
+    : { data: [] as { role_id: string; permission_key: string }[], error: null };
+  if (rolePermissionError) throw new Error("دریافت مجوزهای نقش‌ها انجام نشد.");
+
+  const { data: permissionCatalogue, error: permissionCatalogueError } = await supabase
+    .from("permissions")
+    .select("permission_key,module_key,label_fa,description_fa,is_sensitive")
+    .order("module_key")
+    .order("action_key");
+  if (permissionCatalogueError) throw new Error("دریافت فهرست مجوزها انجام نشد.");
+
+  const roles = (roleRows ?? []).map((role) => ({
+    ...role,
+    permissionKeys: (rolePermissionRows ?? [])
+      .filter((item) => item.role_id === role.id)
+      .map((item) => item.permission_key),
+  }));
+
   return (
     <main className="dashboard-shell">
       <header className="dashboard-topbar">
@@ -71,6 +103,13 @@ export default async function BusinessMembersPage({
         canTransfer={permissionKeys.has("business.ownership.transfer")}
         canManageMembers={permissionKeys.has("team.members.manage")}
         currentUserId={auth.user.id}
+      />
+      <RolesPanel
+        businessId={businessId}
+        roles={roles}
+        permissions={permissionCatalogue ?? []}
+        manageablePermissionKeys={[...permissionKeys]}
+        canManageRoles={permissionKeys.has("team.roles.manage")}
       />
     </main>
   );
