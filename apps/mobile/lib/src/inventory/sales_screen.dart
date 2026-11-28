@@ -48,7 +48,9 @@ class _SalesScreenState extends State<SalesScreen> {
         businessId: widget.membership.businessId,
         branchId: widget.branch.id,
       ),
-      widget.repository.fetchCustomers(widget.membership.businessId),
+      widget.permissions.contains('crm.customers.read')
+          ? widget.repository.fetchCustomers(widget.membership.businessId)
+          : Future.value(const <CustomerRecord>[]),
     ]);
     return (
       products: result[0] as List<InventoryProduct>,
