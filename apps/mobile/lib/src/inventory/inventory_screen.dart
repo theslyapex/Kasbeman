@@ -47,12 +47,15 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   void _reload() {
-    _productsFuture =
-        _repository.fetchProducts(widget.membership.businessId);
-    _balancesFuture = _repository.fetchBalances(
-      businessId: widget.membership.businessId,
-      branchId: widget.branch.id,
-    );
+    _productsFuture = _permissions.canReadItems
+        ? _repository.fetchProducts(widget.membership.businessId)
+        : Future.error(StateError('inventory.items.read permission required'));
+    _balancesFuture = _permissions.canReadStock
+        ? _repository.fetchBalances(
+            businessId: widget.membership.businessId,
+            branchId: widget.branch.id,
+          )
+        : Future.error(StateError('inventory.stock.read permission required'));
   }
 
   Future<void> _openHistory() async {
@@ -219,10 +222,14 @@ class _InventoryScreenState extends State<InventoryScreen>
       body: TabBarView(
         controller: _tabs,
         children: [
-          _ProductsTab(future: _productsFuture),
+          _ProductsTab(
+            future: _productsFuture,
+            canRead: _permissions.canReadItems,
+          ),
           _BalancesTab(
             future: _balancesFuture,
             branchName: widget.branch.name,
+            canRead: _permissions.canReadStock,
           ),
         ],
       ),
@@ -231,12 +238,20 @@ class _InventoryScreenState extends State<InventoryScreen>
 }
 
 class _ProductsTab extends StatelessWidget {
-  const _ProductsTab({required this.future});
+  const _ProductsTab({required this.future, required this.canRead});
 
   final Future<List<InventoryProduct>> future;
+  final bool canRead;
 
   @override
   Widget build(BuildContext context) {
+    if (!canRead) {
+      return const _InventoryMessage(
+        title: 'دسترسی مشاهده کالاها فعال نیست',
+        description: 'برای مشاهده فهرست کالاها از مدیر کسب‌وکار دسترسی لازم را دریافت کن.',
+        icon: Icons.lock_outline,
+      );
+    }
     return FutureBuilder<List<InventoryProduct>>(
       future: future,
       builder: (context, snapshot) {
@@ -301,13 +316,22 @@ class _BalancesTab extends StatelessWidget {
   const _BalancesTab({
     required this.future,
     required this.branchName,
+    required this.canRead,
   });
 
   final Future<List<InventoryBalance>> future;
   final String branchName;
+  final bool canRead;
 
   @override
   Widget build(BuildContext context) {
+    if (!canRead) {
+      return const _InventoryMessage(
+        title: 'دسترسی مشاهده موجودی فعال نیست',
+        description: 'برای مشاهده موجودی انبار از مدیر کسب‌وکار دسترسی لازم را دریافت کن.',
+        icon: Icons.lock_outline,
+      );
+    }
     return FutureBuilder<List<InventoryBalance>>(
       future: future,
       builder: (context, snapshot) {
