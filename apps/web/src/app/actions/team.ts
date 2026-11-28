@@ -97,3 +97,40 @@ export async function transferOwnershipAction(formData: FormData): Promise<TeamA
   revalidatePath("/dashboard");
   return { notice: "مالکیت منتقل شد. نقش مالک قبلی به مدیر تغییر یافت." };
 }
+
+
+export async function suspendBusinessMemberAction(
+  businessId: string,
+  targetUserId: string,
+): Promise<TeamActionResult> {
+  if (!z.string().uuid().safeParse(businessId).success ||
+      !z.string().uuid().safeParse(targetUserId).success) {
+    return { error: "شناسه عضو معتبر نیست." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) return { error: "برای ادامه وارد حساب شوید." };
+  if (auth.user.id === targetUserId) {
+    return { error: "امکان تعلیق عضویت حساب خودتان وجود ندارد." };
+  }
+
+  // The database RLS policy and lifecycle trigger enforce manager authority,
+  // prevent owner suspension, and revoke active role assignments atomically.
+  const { data, error } = await supabase
+    .from("business_members")
+    .update({ status: "suspended" })
+    .eq("business_id", businessId)
+    .eq("user_id", targetUserId)
+    .eq("status", "active")
+    .select("user_id")
+    .maybeSingle();
+
+  if (error || !data) {
+    return { error: "تعلیق عضو انجام نشد؛ ممکن است عضو مالک باشد یا مجوز مدیریت عضویت را نداشته باشید." };
+  }
+
+  revalidatePath(`/dashboard/${businessId}/members`);
+  revalidatePath("/dashboard");
+  return { notice: "عضویت تعلیق شد و دسترسی‌های فعال او در دیتابیس لغو شدند." };
+}
