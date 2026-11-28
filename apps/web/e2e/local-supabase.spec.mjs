@@ -18,7 +18,7 @@ test("web signup, workspace, CRM customer and ticket flow against local Supabase
   const ticketComment = "پیام آزمایشی از رابط وب";
 
   await page.goto("/signup");
-  await page.getByLabel("ایمیل").fill(email);
+  await page.getByLabel("ایمیل", { exact: true }).fill(email);
   await page.getByLabel("رمز عبور", { exact: true }).fill(password);
   await page.getByLabel("تکرار رمز عبور", { exact: true }).fill(password);
   await page.getByRole("button", { name: "ایجاد حساب کسبمن" }).click();
@@ -58,8 +58,8 @@ test("web signup, workspace, CRM customer and ticket flow against local Supabase
 
   await page.getByRole("button", { name: "خروج از حساب" }).click();
   await expect(page).toHaveURL(/login$/);
-  await page.getByLabel("ایمیل").fill(email);
-  await page.getByLabel("رمز عبور").fill(password);
+  await page.getByLabel("ایمیل", { exact: true }).fill(email);
+  await page.getByLabel("رمز عبور", { exact: true }).fill(password);
   await page.getByRole("button", { name: "ورود به حساب" }).click();
   await expect(page).toHaveURL(/dashboard(?:\?.*)?$/);
   await expect(page.getByRole("heading", { name: businessName })).toBeVisible();
