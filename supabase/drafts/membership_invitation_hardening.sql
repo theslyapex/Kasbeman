@@ -52,6 +52,45 @@ create trigger business_member_lifecycle_guard
   when (old.status is distinct from new.status)
   execute function private.guard_business_member_lifecycle();
 
+-- Owner grants cannot be revoked through the ordinary role-assignment path.
+-- A future ownership-transfer RPC must implement its own atomic transfer protocol.
+create or replace function private.guard_owner_role_assignment()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_role_key text;
+begin
+  select r.role_key into v_role_key
+  from public.roles r
+  where r.business_id = old.business_id
+    and r.id = old.role_id;
+
+  if old.status = 'active' and v_role_key = 'owner' then
+    if tg_op = 'DELETE' or new.status <> 'active' then
+      raise exception 'Owner role assignment requires the dedicated ownership transfer flow'
+        using errcode = '23514';
+    end if;
+  end if;
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$;
+
+revoke all on function private.guard_owner_role_assignment()
+  from public, anon, authenticated;
+
+drop trigger if exists owner_role_assignment_guard on public.member_role_assignments;
+create trigger owner_role_assignment_guard
+  before update of status or delete on public.member_role_assignments
+  for each row
+  execute function private.guard_owner_role_assignment();
+
 -- A manager may not suspend a member whose active role grants permissions
 -- beyond the manager's own business-wide authority.
 create or replace function private.can_manage_business_member(
