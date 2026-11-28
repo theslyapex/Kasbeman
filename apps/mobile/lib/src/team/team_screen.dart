@@ -159,7 +159,9 @@ class _TeamScreenState extends State<TeamScreen> {
 
   Future<void> _assignCustomRole(Map<String, dynamic> member) async {
     if (!_canAssignRoles || member['status'] != 'active' ||
-        member['role_key'] == 'owner' || _customRoles.isEmpty) return;
+        member['role_key'] == 'owner' || _customRoles.isEmpty) {
+      return;
+    }
     String? selectedRoleId;
     final accepted = await showDialog<bool>(
       context: context,
@@ -199,9 +201,11 @@ class _TeamScreenState extends State<TeamScreen> {
       await _load();
       if (mounted) _showMessage('نقش سفارشی به عضو تخصیص داده شد.');
     } on PostgrestException catch (error) {
-      if (mounted) _showMessage(error.code == '23505'
-          ? 'این نقش قبلاً به عضو تخصیص داده شده است.'
-          : 'تخصیص نقش انجام نشد؛ مجوز و سطح دسترسی نقش بررسی شوند.');
+      if (mounted) {
+        _showMessage(error.code == '23505'
+            ? 'این نقش قبلاً به عضو تخصیص داده شده است.'
+            : 'تخصیص نقش انجام نشد؛ مجوز و سطح دسترسی نقش بررسی شوند.');
+      }
     } catch (_) {
       if (mounted) _showMessage('تخصیص نقش انجام نشد.');
     } finally {
