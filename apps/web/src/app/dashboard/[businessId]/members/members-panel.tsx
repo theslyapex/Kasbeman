@@ -5,17 +5,31 @@ import {
   createInvitationAction,
   revokeInvitationAction,
   suspendBusinessMemberAction,
+  assignCustomRoleAction,
+  revokeMemberRoleAssignmentAction,
   transferOwnershipAction,
   type TeamActionResult,
 } from "@/app/actions/team";
 
 type Member = { user_id: string; role_key: string; status: string; joined_at: string };
 type Invitation = { id: string; email: string; role_key: string; status: string; expires_at: string };
+type MemberRoleAssignment = {
+  id: string;
+  user_id: string;
+  role_id: string;
+  roleName: string;
+  branch_id: string | null;
+  status: string;
+};
+type AssignableRole = { id: string; name: string; description: string | null };
 
 export function MembersPanel({
   businessId,
   members,
   invitations,
+  memberAssignments,
+  assignableRoles,
+  canAssignRoles,
   canInvite,
   canTransfer,
   canManageMembers,
@@ -24,6 +38,9 @@ export function MembersPanel({
   businessId: string;
   members: Member[];
   invitations: Invitation[];
+  memberAssignments: MemberRoleAssignment[];
+  assignableRoles: AssignableRole[];
+  canAssignRoles: boolean;
   canInvite: boolean;
   canTransfer: boolean;
   canManageMembers: boolean;
@@ -32,6 +49,7 @@ export function MembersPanel({
   const [busy, startTransition] = useTransition();
   const [result, setResult] = useState<TeamActionResult>({});
   const [token, setToken] = useState("");
+  const [selectedRoleByMember, setSelectedRoleByMember] = useState<Record<string, string>>({});
 
   function run(action: () => Promise<TeamActionResult>) {
     startTransition(async () => {
@@ -82,8 +100,50 @@ export function MembersPanel({
         <div className="team-list">
           {members.map((member) => (
             <article className="team-row" key={member.user_id}>
-              <div><strong>{member.role_key === "owner" ? "مالک" : member.role_key === "admin" ? "مدیر" : "عضو"}</strong>
-                <small dir="ltr">{member.user_id}</small></div>
+              <div>
+                <strong>{member.role_key === "owner" ? "مالک" : member.role_key === "admin" ? "مدیر" : "عضو"}</strong>
+                <small dir="ltr">{member.user_id}</small>
+                {memberAssignments.filter((assignment) => assignment.user_id === member.user_id).map((assignment) => (
+                  <small key={assignment.id}>
+                    {assignment.roleName}{assignment.branch_id ? " · نقش شعبه‌ای" : " · نقش سراسری"}
+                    {canManageMembers && assignment.branch_id === null ? (
+                      <button
+                        type="button"
+                        className="text-danger"
+                        disabled={busy}
+                        onClick={() => {
+                          if (!window.confirm(`تخصیص نقش «${assignment.roleName}» لغو شود؟`)) return;
+                          run(() => revokeMemberRoleAssignmentAction({ businessId, assignmentId: assignment.id }));
+                        }}
+                      >لغو نقش</button>
+                    ) : null}
+                  </small>
+                ))}
+                {canAssignRoles && member.status === "active" && member.role_key !== "owner" && assignableRoles.length > 0 ? (
+                  <div className="team-row-actions" style={{ marginTop: 8 }}>
+                    <select
+                      aria-label="انتخاب نقش سفارشی"
+                      value={selectedRoleByMember[member.user_id] ?? ""}
+                      onChange={(event) => setSelectedRoleByMember((current) => ({ ...current, [member.user_id]: event.target.value }))}
+                    >
+                      <option value="">تخصیص نقش سفارشی...</option>
+                      {assignableRoles.map((role) => (
+                        <option value={role.id} key={role.id}>{role.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={busy || !selectedRoleByMember[member.user_id]}
+                      onClick={() => {
+                        const roleId = selectedRoleByMember[member.user_id];
+                        if (!roleId) return;
+                        run(() => assignCustomRoleAction({ businessId, targetUserId: member.user_id, roleId }));
+                        setSelectedRoleByMember((current) => ({ ...current, [member.user_id]: "" }));
+                      }}
+                    >تخصیص</button>
+                  </div>
+                ) : null}
+              </div>
               <div className="team-row-actions">
                 <span className={member.status === "active" ? "business-status" : "team-muted"}>{member.status === "active" ? "فعال" : member.status === "suspended" ? "تعلیق‌شده" : member.status}</span>
                 {canManageMembers && member.status === "active" && member.role_key !== "owner" && member.user_id !== currentUserId ? (
