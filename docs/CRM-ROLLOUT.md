@@ -51,6 +51,7 @@ The sales/inventory draft references the CRM-owned `public.customers` table but 
 - Mobile CI: commit `fed6e3fd1282e6411a10b062ef6fd37544a7deed`; Flutter Analyze, tests and Android Debug build passed: https://github.com/theslyapex/Kasbeman/actions/runs/46145316201
 - Canonical migration CI: commit `a7f82fe52efdb925bc981cab6172e5a72f05fa45`; CRM migration security check, PostgreSQL 17 schema/tenant tests, multi-connection concurrency, vinext, TypeScript, ESLint and production build all passed: https://github.com/theslyapex/Kasbeman/actions/runs/46146010427
 - Combined CRM + ticketing + sales/inventory CI: commit `f3b08c98a5725bc07b1e8fa80fc1a8c4f61786fc`; all three canonical migration/security checks, PostgreSQL 17 schema and tenant-isolation suite, multi-connection concurrency suite, TypeScript, ESLint and production build passed: https://github.com/theslyapex/Kasbeman/actions/runs/46146525793
+- Real local Supabase integration: commit `110356d6ad3591b90290c2a34a09294ad20f3f1e`; Auth signup/session, Auth profile trigger, authenticated PostgREST/RLS, tenant creation RPC, CRM/ticketing/sales schema smoke tests and concurrency passed: https://github.com/theslyapex/Kasbeman/actions/runs/46147757682
 
 ## Required production rollout
 
@@ -64,4 +65,4 @@ Do not create a placeholder customer table, disable RLS, relax composite foreign
 
 ## Release gate
 
-The canonical CRM migration is generated and has passed the combined PostgreSQL 17 CI suite alongside ticketing and sales/inventory. It has not been applied to production. No staging Supabase environment or live web/mobile E2E test has been established. The public deployment remains unconfigured, and `main` remains untouched.
+The canonical CRM migration is generated and has passed both the combined PostgreSQL 17 suite and local Supabase Auth/Data API integration alongside ticketing and sales/inventory. It has not been applied to production. No hosted staging environment or live web/mobile client E2E test has been established. The public deployment remains unconfigured, and `main` remains untouched.
