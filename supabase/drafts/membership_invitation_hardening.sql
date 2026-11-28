@@ -331,6 +331,15 @@ begin
       using errcode = '23505';
   end if;
 
+  -- A previously suspended/revoked membership may predate the lifecycle
+  -- trigger. Clear any stale active grants before restoring access.
+  update public.member_role_assignments
+  set status = 'revoked',
+      revoked_at = coalesce(revoked_at, now())
+  where business_id = v_invitation.business_id
+    and user_id = v_user_id
+    and status = 'active';
+
   insert into public.business_members (business_id, user_id, role_key, status)
   values (v_invitation.business_id, v_user_id, v_invitation.role_key, 'active')
   on conflict (business_id, user_id) do update
