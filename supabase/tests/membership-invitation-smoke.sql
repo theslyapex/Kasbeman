@@ -288,7 +288,7 @@ RESET ROLE;
 UPDATE public.business_members
 SET role_key = 'owner'
 WHERE business_id = :'business_id'::uuid
-  AND user_id = '10000000-0000-4000-8000-000000000002'
+  AND user_id = '10000000-0000-4000-8000-000000000005'
   AND status = 'active';
 
 SET ROLE authenticated;
@@ -297,7 +297,7 @@ DO $legacy_owner_guard$
 BEGIN
   IF private.can_manage_business_member(
     current_setting('kasbeman.test_business_id')::uuid,
-    '10000000-0000-4000-8000-000000000002'::uuid
+    '10000000-0000-4000-8000-000000000005'::uuid
   ) THEN
     RAISE EXCEPTION 'Legacy owner was considered manageable';
   END IF;
@@ -328,13 +328,13 @@ BEGIN
     (SELECT jsonb_build_object('status', bm.status, 'role_key', bm.role_key)
      FROM public.business_members bm
      WHERE bm.business_id = current_setting('kasbeman.test_business_id')::uuid
-       AND bm.user_id = '10000000-0000-4000-8000-000000000002');
+       AND bm.user_id = '10000000-0000-4000-8000-000000000005');
 
   BEGIN
     UPDATE public.business_members
     SET status = 'suspended'
     WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
-      AND user_id = '10000000-0000-4000-8000-000000000002';
+      AND user_id = '10000000-0000-4000-8000-000000000005';
     GET DIAGNOSTICS v_rows = ROW_COUNT;
     IF v_rows <> 1 THEN
       RAISE EXCEPTION 'Expected one legacy-owner membership row, got %', v_rows;
@@ -348,7 +348,7 @@ $legacy_owner_suspend$;
 UPDATE public.business_members
 SET role_key = 'member'
 WHERE business_id = :'business_id'::uuid
-  AND user_id = '10000000-0000-4000-8000-000000000002'
+  AND user_id = '10000000-0000-4000-8000-000000000005'
   AND status = 'active';
 
 
