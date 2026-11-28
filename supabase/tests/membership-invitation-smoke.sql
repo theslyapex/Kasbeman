@@ -886,8 +886,7 @@ SELECT set_config('kasbeman.test_branch_management_id', :'branch_management_test
 UPDATE public.branches
 SET name = 'شعبه ویرایش‌شده',
     code = 'CI-BRANCH-UPDATED',
-    status = 'inactive',
-    updated_at = now()
+    status = 'inactive'
 WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
   AND id = current_setting('kasbeman.test_branch_management_id')::uuid;
 
@@ -910,7 +909,7 @@ END
 $branch_management_test$;
 
 UPDATE public.branches
-SET status = 'active', updated_at = now()
+SET status = 'active'
 WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
   AND id = current_setting('kasbeman.test_branch_management_id')::uuid;
 
