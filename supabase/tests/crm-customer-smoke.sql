@@ -36,9 +36,7 @@ VALUES
  (:'business_id'::uuid, '10000000-0000-4000-8000-000000000002',
   :'crm_reader_role_id'::uuid, NULL, 'active', auth.uid()),
  (:'business_id'::uuid, '10000000-0000-4000-8000-000000000004',
-  :'crm_editor_role_id'::uuid, NULL, 'active', auth.uid()),
- (:'business_id'::uuid, '10000000-0000-4000-8000-000000000002',
-  :'crm_creator_role_id'::uuid, NULL, 'active', auth.uid());
+  :'crm_editor_role_id'::uuid, NULL, 'active', auth.uid());
 
 -- Remove the default member role's baseline CRM read permission for this fixture
 -- so the following role-isolation assertions are meaningful.
@@ -115,6 +113,10 @@ WHERE business_id=:'business_id'::uuid
   AND user_id='10000000-0000-4000-8000-000000000002'
   AND role_id IN (:'crm_reader_role_id'::uuid, :'customer_reader_role_id'::uuid)
   AND status='active';
+INSERT INTO public.member_role_assignments
+ (business_id, user_id, role_id, branch_id, status, assigned_by)
+VALUES (:'business_id'::uuid, '10000000-0000-4000-8000-000000000002',
+        :'crm_creator_role_id'::uuid, NULL, 'active', auth.uid());
 RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
