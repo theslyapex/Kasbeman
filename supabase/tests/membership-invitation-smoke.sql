@@ -287,7 +287,7 @@ RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
 
-DO $
+DO $$
 BEGIN
   BEGIN
     PERFORM public.transfer_business_ownership(
@@ -298,13 +298,13 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
 END
-$;
+$$;
 
 RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 
-DO $
+DO $$
 BEGIN
   BEGIN
     PERFORM public.transfer_business_ownership(
@@ -315,7 +315,7 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL;
   END;
 END
-$;
+$$;
 
 SELECT public.transfer_business_ownership(
   current_setting('kasbeman.test_business_id')::uuid,
@@ -323,7 +323,7 @@ SELECT public.transfer_business_ownership(
 ) AS transferred_owner_id \gset
 SELECT set_config('kasbeman.test_transferred_owner_id', :'transferred_owner_id', false);
 
-DO $
+DO $$
 DECLARE
   v_business_id uuid := current_setting('kasbeman.test_business_id')::uuid;
   v_new_owner_id uuid := current_setting('kasbeman.test_transferred_owner_id')::uuid;
@@ -397,13 +397,13 @@ BEGIN
     RAISE EXCEPTION 'Previous owner retained ownership transfer permission';
   END IF;
 END
-$;
+$$;
 
 RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000004';
 
-DO $
+DO $$
 BEGIN
   IF NOT private.has_business_permission(
     current_setting('kasbeman.test_business_id')::uuid,
@@ -413,6 +413,6 @@ BEGIN
     RAISE EXCEPTION 'New owner did not receive ownership authority';
   END IF;
 END
-$;
+$$;
 
 SELECT 'Membership lifecycle and invitation hardening checks passed.' AS result;
