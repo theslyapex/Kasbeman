@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   addTicketCommentAction, createTicketAction, updateTicketContentAction,
   updateTicketWorkflowAction, type TicketActionResult,
@@ -29,6 +30,7 @@ export function TicketsPanel(props:{
  businessId:string;tickets:Ticket[];branches:Branch[];members:Member[];customers:Customer[];
  comments:Comment[];events:Event[];globalPermissions:string[];branchPermissions:Record<string,string[]>;
 }) {
+ const router=useRouter();
  const permissionsFor=(branchId:string)=>new Set([...props.globalPermissions,...(props.branchPermissions[branchId]??[])]);
  const createBranches=props.branches.filter(b=>permissionsFor(b.id).has("tickets.create"));
  const [busy,startTransition]=useTransition();
@@ -46,6 +48,9 @@ export function TicketsPanel(props:{
  const [newBranch,setNewBranch]=useState(createBranches.find(x=>x.isPrimary)?.id??createBranches[0]?.id??"");
  const [newPriority,setNewPriority]=useState("normal");
 
+ useEffect(()=>{
+   if(selectedId===null&&props.tickets[0])setSelectedId(props.tickets[0].id);
+ },[props.tickets,selectedId]);
  const selected=props.tickets.find(t=>t.id===selectedId)??null;
  const selectedPermissions=selected?permissionsFor(selected.branch_id):new Set<string>();
  const visible=useMemo(()=>props.tickets.filter(t=>
@@ -65,7 +70,7 @@ export function TicketsPanel(props:{
  const canInternalCreate=selectedPermissions.has("tickets.comments.internal.create");
 
  function run(action:()=>Promise<TicketActionResult>,after?:()=>void) {
-   startTransition(async()=>{const r=await action();setResult(r);if(r.notice)after?.();});
+   startTransition(async()=>{const r=await action();setResult(r);if(r.notice){after?.();router.refresh();}});
  }
  function beginEdit(t:Ticket) {setEditTitle(t.title);setEditDescription(t.description);setEditPriority(t.priority);setShowEdit(true);}
  function saveEdit() {
