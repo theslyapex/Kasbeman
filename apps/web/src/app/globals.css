@@ -313,3 +313,30 @@ h1 span {
   .business-section-heading { align-items: flex-start; flex-direction: column; }
   .business-section-heading .compact-submit { width: 100%; }
 }
+
+
+/* Team management */
+.business-manage-link { padding: 8px 12px; border: 1px solid rgba(0,216,232,.24); border-radius: 10px; color: var(--cyan); text-decoration: none; font-size: 11px; white-space: nowrap; }
+.team-layout { display: grid; gap: 16px; padding-bottom: 48px; }
+.team-card { padding: 22px; border: 1px solid rgba(220,229,240,.1); border-radius: 18px; background: rgba(16,35,61,.48); }
+.team-card h2 { margin: 0 0 16px; font-size: 17px; }
+.team-card > p { color: var(--muted); font-size: 12px; line-height: 1.9; }
+.team-count { display: inline-grid; min-width: 24px; height: 24px; place-items: center; margin-inline-start: 6px; border-radius: 8px; background: rgba(0,216,232,.1); color: var(--cyan); font-size: 11px; }
+.team-form { display: grid; gap: 14px; max-width: 520px; }
+.team-form select { min-height: 46px; padding: 10px 12px; border: 1px solid rgba(220,229,240,.14); border-radius: 10px; color: var(--text); background: #10233d; }
+.team-list { display: grid; gap: 9px; }
+.team-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 14px; border: 1px solid rgba(220,229,240,.08); border-radius: 12px; background: rgba(3,14,27,.28); }
+.team-row > div:first-child { display: grid; gap: 6px; min-width: 0; }
+.team-row small { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+.team-row-actions { display: flex; align-items: center; gap: 12px; }
+.team-muted { color: var(--muted); font-size: 11px; }
+.text-danger { border: 0; background: transparent; color: #ff9a9a; cursor: pointer; font: inherit; font-size: 11px; }
+.danger-submit { min-height: 44px; border: 1px solid rgba(255,120,120,.35); border-radius: 10px; color: #ffd1d1; background: rgba(150,35,50,.24); cursor: pointer; }
+.team-danger-zone { border-color: rgba(255,120,120,.22); }
+.invite-token { display: block; margin: 12px 0; padding: 12px; overflow-wrap: anywhere; border-radius: 10px; color: var(--cyan); background: rgba(3,14,27,.6); font-size: 11px; }
+@media (max-width: 600px) {
+  .business-manage-link { margin-inline-start: auto; }
+  .team-card { padding: 17px; }
+  .team-row { align-items: flex-start; flex-direction: column; }
+  .team-row-actions { width: 100%; justify-content: space-between; }
+}
