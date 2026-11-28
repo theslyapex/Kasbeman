@@ -1,0 +1,133 @@
+name: Kasbeman App E2E (Local Supabase)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "foundation/**"
+    paths:
+      - "apps/web/**"
+      - "apps/mobile/**"
+      - "supabase/**"
+      - "scripts/e2e/**"
+      - ".github/workflows/app-e2e-local.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "apps/web/**"
+      - "apps/mobile/**"
+      - "supabase/**"
+      - "scripts/e2e/**"
+      - ".github/workflows/app-e2e-local.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-e2e-local-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-and-mobile:
+    name: Web and Flutter UI against local Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install web dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.67.1
+
+      - name: Install PostgreSQL and JSON tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client jq
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve Flutter dependencies
+        working-directory: apps/mobile
+        run: flutter pub get
+
+      - name: Start isolated local Supabase and apply canonical migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase start
+          supabase db reset --local --yes
+          eval "$(supabase status -o env)"
+          api_url="${API_URL:-http://127.0.0.1:54321}"
+          anon_key="${ANON_KEY:-${PUBLISHABLE_KEY:-}}"
+          if [[ -z "$anon_key" ]]; then
+            echo "Local Supabase publishable key was not returned." >&2
+            exit 1
+          fi
+          {
+            echo "SUPABASE_E2E_URL=$api_url"
+            echo "SUPABASE_E2E_KEY=$anon_key"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$api_url"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$anon_key"
+            echo "NEXT_PUBLIC_SITE_URL=http://127.0.0.1:3000"
+          } >> "$GITHUB_ENV"
+
+      - name: Start Next.js against local Supabase
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --filter @kasbeman/web dev -- --hostname 127.0.0.1 > /tmp/kasbeman-next.log 2>&1 &
+          echo $! > /tmp/kasbeman-next.pid
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail http://127.0.0.1:3000/login >/dev/null; then
+              echo "Next.js is ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/kasbeman-next.log
+          exit 1
+
+      - name: Run browser E2E for signup, workspace, CRM and tickets
+        working-directory: apps/web
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm dlx --package=@playwright/test@1.56.1 -- sh -c '
+            export PLAYWRIGHT_CLI_PATH="$(readlink -f "$(command -v playwright)")"
+            playwright install --with-deps chromium
+            playwright test --config playwright.config.mjs
+          '
+
+      - name: Run Flutter UI E2E against local Supabase Auth and Data API
+        working-directory: apps/mobile
+        run: |
+          flutter test test/local_supabase_e2e_test.dart --reporter expanded
+          --dart-define=SUPABASE_URL="$SUPABASE_E2E_URL"
+          --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_E2E_KEY"
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup
