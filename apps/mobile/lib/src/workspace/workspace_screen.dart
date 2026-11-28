@@ -56,6 +56,53 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     }
   }
 
+  Future<void> _acceptInvitation() async {
+    final tokenController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('پذیرش دعوت‌نامه'),
+        content: TextField(
+          controller: tokenController,
+          textDirection: TextDirection.ltr,
+          decoration: const InputDecoration(labelText: 'توکن دعوت'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('پذیرش'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      tokenController.dispose();
+      return;
+    }
+    try {
+      await Supabase.instance.client.rpc(
+        'accept_business_invitation',
+        params: {'p_token': tokenController.text.trim()},
+      );
+      if (!mounted) return;
+      setState(_loadMemberships);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('عضویت با موفقیت ثبت شد.')),
+      );
+    } on PostgrestException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('پذیرش دعوت انجام نشد. ایمیل تأییدشده باید با ایمیل دعوت‌نامه یکسان باشد.')),
+      );
+    } finally {
+      tokenController.dispose();
+    }
+  }
+
   Future<void> _signOut() async {
     try {
       await Supabase.instance.client.auth.signOut();
@@ -102,6 +149,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
             tooltip: 'ساخت کسب‌وکار',
             onPressed: _createBusiness,
             icon: const Icon(Icons.add_business_outlined),
+          ),
+          IconButton(
+            tooltip: 'پذیرش دعوت‌نامه',
+            onPressed: _acceptInvitation,
+            icon: const Icon(Icons.mark_email_unread_outlined),
           ),
           IconButton(
             tooltip: 'خروج از حساب',
