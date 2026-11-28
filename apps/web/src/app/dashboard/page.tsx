@@ -51,6 +51,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 <span className="business-symbol">ک</span>
                 <div className="business-meta"><h3>{business.name}</h3><span dir="ltr">{business.slug}</span></div>
                 <Link className="business-manage-link" href={`/dashboard/${business.id}/members`}>مدیریت اعضا</Link>
+                <Link className="business-manage-link" href={`/dashboard/${business.id}/tickets`}>تیکت‌ها</Link>
                 <span className="business-status">فعال</span>
               </article>
             ))}
