@@ -109,8 +109,7 @@ SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
 INSERT INTO public.customers (business_id, name, created_by)
 VALUES (current_setting('kasbeman.test_business_id')::uuid,
-        'مشتری ایجادشده توسط نقش محدود', auth.uid())
-RETURNING id AS crm_created_customer_id \gset
+        'مشتری ایجادشده توسط نقش محدود', auth.uid());
 
 DO $crm_creator_scope$
 BEGIN
