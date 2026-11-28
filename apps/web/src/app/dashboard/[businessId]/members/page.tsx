@@ -131,8 +131,12 @@ export default async function BusinessMembersPage({
         invitations={invitations ?? []}
         memberAssignments={memberAssignments}
         assignableRoles={assignableRoles}
-        branches={(branchRows ?? []).map(({ id, name, code, is_primary, status }) => ({ id, name, code, is_primary, status }))}
+        branches={(branchRows ?? []).map(({ id, name, code, is_primary, status }) => ({
+          id, name, code, is_primary,
+          status: status as "active" | "inactive" | "archived",
+        }))}
         canManageBranches={canManageBranches}
+        canReadBranches={canReadBranches}
         canAssignRoles={permissionKeys.has("team.roles.assign")}
         canInvite={permissionKeys.has("team.members.invite")}
         canTransfer={permissionKeys.has("business.ownership.transfer")}
