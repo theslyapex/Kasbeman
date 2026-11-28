@@ -641,7 +641,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                   spacing: 8,
                                   runSpacing: 8,
                                   children: [
-                                    if (widget._canExport)
+                                    if (widget._canExport && widget._canReadPayments)
                                       OutlinedButton.icon(
                                       onPressed: _exportingCustomerId == customer.id
                                           ? null
