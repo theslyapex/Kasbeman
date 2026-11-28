@@ -1,5 +1,55 @@
 \set ON_ERROR_STOP on
 
+-- Function ACL regression checks. has_function_privilege() includes inherited
+-- PUBLIC grants, so a true result for anon would catch an accidental PUBLIC EXECUTE.
+DO $$
+DECLARE
+  v_function text;
+  v_public_endpoints text[] := ARRAY[
+    'public.create_business(text,text)',
+    'public.create_sale_draft(uuid,uuid,uuid,text,jsonb,uuid,text,text)',
+    'public.confirm_sale(uuid)',
+    'public.record_customer_receipt(uuid,numeric,text,uuid,text,text)',
+    'public.reverse_customer_receipt(uuid,text)'
+  ];
+  v_authenticated_helpers text[] := ARRAY[
+    'private.has_business_permission(uuid,text,uuid)',
+    'private.can_assign_business_role(uuid,uuid,uuid,uuid)',
+    'private.can_manage_business_member(uuid,uuid)'
+  ];
+  v_internal_trigger_functions text[] := ARRAY[
+    'private.create_default_warehouse_for_branch()',
+    'private.apply_stock_movement()',
+    'private.log_authorization_change()'
+  ];
+BEGIN
+  FOREACH v_function IN ARRAY v_public_endpoints LOOP
+    IF has_function_privilege('anon', v_function, 'EXECUTE') THEN
+      RAISE EXCEPTION 'Anonymous role can execute privileged endpoint: %', v_function;
+    END IF;
+    IF NOT has_function_privilege('authenticated', v_function, 'EXECUTE') THEN
+      RAISE EXCEPTION 'Authenticated role cannot execute expected endpoint: %', v_function;
+    END IF;
+  END LOOP;
+
+  FOREACH v_function IN ARRAY v_authenticated_helpers LOOP
+    IF has_function_privilege('anon', v_function, 'EXECUTE') THEN
+      RAISE EXCEPTION 'Anonymous role can execute internal authorization helper: %', v_function;
+    END IF;
+    IF NOT has_function_privilege('authenticated', v_function, 'EXECUTE') THEN
+      RAISE EXCEPTION 'Authenticated role cannot execute required authorization helper: %', v_function;
+    END IF;
+  END LOOP;
+
+  FOREACH v_function IN ARRAY v_internal_trigger_functions LOOP
+    IF has_function_privilege('anon', v_function, 'EXECUTE')
+       OR has_function_privilege('authenticated', v_function, 'EXECUTE') THEN
+      RAISE EXCEPTION 'Internal trigger function is directly executable by API roles: %', v_function;
+    END IF;
+  END LOOP;
+END
+$$;
+
 INSERT INTO auth.users (id, raw_user_meta_data) VALUES
   ('10000000-0000-4000-8000-000000000001', '{"full_name":"Kasbeman Test Owner"}'),
   ('10000000-0000-4000-8000-000000000002', '{"full_name":"Kasbeman Test Branch Member"}'),
@@ -447,6 +497,13 @@ BEGIN
       '40000000-0000-4000-8000-000000000001'
     );
     RAISE EXCEPTION 'Member without finance.payments.manage recorded a receipt';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    PERFORM public.confirm_sale(
+      current_setting('kasbeman.test_insufficient_sale_id')::uuid
+    );
+    RAISE EXCEPTION 'Member without sales.invoices.manage confirmed a sale';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
   BEGIN
