@@ -30,7 +30,11 @@ class _InventoryMovementScreenState extends State<InventoryMovementScreen> {
   @override
   void initState() {
     super.initState();
-    _data = widget.permissions.contains('inventory.stock.manage')
+    _data = widget.permissions.containsAll(const [
+          'inventory.stock.manage',
+          'inventory.items.read',
+          'inventory.stock.read',
+        ])
         ? _load()
         : Future.value((
             products: <InventoryProduct>[],
@@ -55,7 +59,11 @@ class _InventoryMovementScreenState extends State<InventoryMovementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.permissions.contains('inventory.stock.manage')) {
+    if (!widget.permissions.containsAll(const [
+          'inventory.stock.manage',
+          'inventory.items.read',
+          'inventory.stock.read',
+        ])) {
       return const Scaffold(
         body: Center(child: Text('برای مدیریت موجودی مجوز کافی نداری.')),
       );

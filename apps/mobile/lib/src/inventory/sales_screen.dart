@@ -32,7 +32,11 @@ class _SalesScreenState extends State<SalesScreen> {
   @override
   void initState() {
     super.initState();
-    _data = widget.permissions.contains('sales.invoices.manage')
+    _data = widget.permissions.containsAll(const [
+          'sales.invoices.manage',
+          'inventory.items.read',
+          'inventory.stock.read',
+        ])
         ? _load()
         : Future.value((
             products: <InventoryProduct>[],
@@ -65,7 +69,11 @@ class _SalesScreenState extends State<SalesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.permissions.contains('sales.invoices.manage')) {
+    if (!widget.permissions.containsAll(const [
+          'sales.invoices.manage',
+          'inventory.items.read',
+          'inventory.stock.read',
+        ])) {
       return const Scaffold(
         body: Center(child: Text('برای ثبت فروش مجوز کافی نداری.')),
       );

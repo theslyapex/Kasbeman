@@ -184,7 +184,9 @@ class _InventoryScreenState extends State<InventoryScreen>
               onPressed: _openSalesHistory,
               icon: const Icon(Icons.receipt_long_outlined),
             ),
-          if (_permissions.canManageSales)
+          if (_permissions.canManageSales &&
+              _permissions.canReadItems &&
+              _permissions.canReadStock)
             IconButton(
               tooltip: 'ثبت فروش',
               onPressed: _openSales,
@@ -196,7 +198,9 @@ class _InventoryScreenState extends State<InventoryScreen>
               onPressed: _openHistory,
               icon: const Icon(Icons.history),
             ),
-          if (_permissions.canManageStock)
+          if (_permissions.canManageStock &&
+              _permissions.canReadItems &&
+              _permissions.canReadStock)
             IconButton(
               tooltip: 'ثبت گردش موجودی',
               onPressed: _openMovements,
