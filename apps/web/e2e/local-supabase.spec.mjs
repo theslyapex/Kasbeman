@@ -25,7 +25,7 @@ test("web signup, workspace, CRM customer and ticket flow against local Supabase
 
   await expect(page).toHaveURL(/dashboard(?:\?.*)?$/);
   await expect(page.getByRole("heading", { name: "فضای کاری تو" })).toBeVisible();
-  await page.getByRole("link", { name: "ساخت اولین فضای کاری" }).click();
+  await page.getByRole("link", { name: "ساخت اولین کسب‌وکار" }).click();
 
   await page.getByLabel("نام کسب‌وکار").fill(businessName);
   await page.getByLabel("شناسه لاتین کسب‌وکار").fill(businessSlug);
