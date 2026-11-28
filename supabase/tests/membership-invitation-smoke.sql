@@ -306,13 +306,30 @@ $legacy_owner_guard$;
 
 RESET ROLE;
 DO $legacy_owner_suspend$
+DECLARE
+  v_rows integer;
 BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_trigger t
+    WHERE t.tgrelid = 'public.business_members'::regclass
+      AND t.tgname = 'business_member_lifecycle_guard'
+      AND t.tgenabled = 'O'
+      AND NOT t.tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'Business member lifecycle guard trigger is missing or disabled';
+  END IF;
+
   BEGIN
     UPDATE public.business_members
     SET status = 'suspended'
     WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
       AND user_id = '10000000-0000-4000-8000-000000000002';
-    RAISE EXCEPTION 'Legacy owner membership was suspended';
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    IF v_rows <> 1 THEN
+      RAISE EXCEPTION 'Expected one legacy-owner membership row, got %', v_rows;
+    END IF;
+    RAISE EXCEPTION 'Legacy owner membership was suspended without trigger rejection';
   EXCEPTION WHEN check_violation THEN NULL;
   END;
 END
