@@ -29,6 +29,8 @@ export function TicketsPanel(props:{
  businessId:string;tickets:Ticket[];branches:Branch[];members:Member[];customers:Customer[];
  comments:Comment[];events:Event[];globalPermissions:string[];branchPermissions:Record<string,string[]>;
 }) {
+ const permissionsFor=(branchId:string)=>new Set([...props.globalPermissions,...(props.branchPermissions[branchId]??[])]);
+ const createBranches=props.branches.filter(b=>permissionsFor(b.id).has("tickets.create"));
  const [busy,startTransition]=useTransition();
  const [result,setResult]=useState<TicketActionResult>({});
  const [selectedId,setSelectedId]=useState<string|null>(props.tickets[0]?.id??null);
@@ -41,11 +43,10 @@ export function TicketsPanel(props:{
  const [editDescription,setEditDescription]=useState("");
  const [editPriority,setEditPriority]=useState("normal");
  const [showEdit,setShowEdit]=useState(false);
- const [newBranch,setNewBranch]=useState(props.branches.find(x=>x.isPrimary)?.id??props.branches[0]?.id??"");
+ const [newBranch,setNewBranch]=useState(createBranches.find(x=>x.isPrimary)?.id??createBranches[0]?.id??"");
  const [newPriority,setNewPriority]=useState("normal");
 
  const selected=props.tickets.find(t=>t.id===selectedId)??null;
- const permissionsFor=(branchId:string)=>new Set([...props.globalPermissions,...(props.branchPermissions[branchId]??[])]);
  const selectedPermissions=selected?permissionsFor(selected.branch_id):new Set<string>();
  const visible=useMemo(()=>props.tickets.filter(t=>
    (filter==="all"||t.status===filter) &&
@@ -53,12 +54,13 @@ export function TicketsPanel(props:{
  ),[props.tickets,filter,query]);
  const comments=selected?props.comments.filter(c=>c.ticket_id===selected.id):[];
  const events=selected?props.events.filter(e=>e.ticket_id===selected.id):[];
- const canCreate=props.branches.some(b=>permissionsFor(b.id).has("tickets.create"));
+ const canCreate=createBranches.length>0;
  const canEdit=selectedPermissions.has("tickets.update");
  const canAssign=selectedPermissions.has("tickets.assign");
  const canStatus=selectedPermissions.has("tickets.status.manage");
  const canArchive=selectedPermissions.has("tickets.delete");
  const canComment=selectedPermissions.has("tickets.comments.create");
+ const canReadComments=selectedPermissions.has("tickets.comments.read");
  const canInternalRead=selectedPermissions.has("tickets.comments.internal.read");
  const canInternalCreate=selectedPermissions.has("tickets.comments.internal.create");
 
@@ -88,7 +90,7 @@ export function TicketsPanel(props:{
     <label className="field"><span>عنوان</span><input name="title" required minLength={3} maxLength={200}/></label>
     <label className="field"><span>شرح درخواست</span><textarea name="description" required maxLength={10000} rows={4}/></label>
     <div className="ticket-form-grid">
-     <label className="field"><span>شعبه</span><select name="branchId" value={newBranch} onChange={e=>setNewBranch(e.target.value)} required>{props.branches.map(b=><option key={b.id} value={b.id}>{b.name}{b.isPrimary?" · اصلی":""}</option>)}</select></label>
+     <label className="field"><span>شعبه</span><select name="branchId" value={newBranch} onChange={e=>setNewBranch(e.target.value)} required>{createBranches.map(b=><option key={b.id} value={b.id}>{b.name}{b.isPrimary?" · اصلی":""}</option>)}</select></label>
      <label className="field"><span>اولویت</span><select value={newPriority} onChange={e=>setNewPriority(e.target.value)}><option value="low">کم</option><option value="normal">عادی</option><option value="high">زیاد</option><option value="urgent">فوری</option></select></label>
      <label className="field"><span>مشتری (اختیاری)</span><select name="customerId" defaultValue=""><option value="">بدون مشتری</option>{props.customers.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
     </div>
@@ -140,10 +142,10 @@ export function TicketsPanel(props:{
      </div>:null}
      <div className="ticket-conversation">
       <h3>گفتگو و یادداشت‌ها</h3>
-      {comments.filter(c=>c.visibility==="public"||canInternalRead).map(c=><article className={"ticket-comment "+(c.visibility==="internal"?"internal":"")} key={c.id}>
+      {canReadComments?comments.filter(c=>c.visibility==="public"||canInternalRead).map(c=><article className={"ticket-comment "+(c.visibility==="internal"?"internal":"")} key={c.id}>
        <div><b>{c.visibility==="internal"?"یادداشت داخلی":"پیام"}</b><small>{new Date(c.created_at).toLocaleString("fa-IR")}</small></div><p>{c.body}</p>
-      </article>)}
-      {comments.length===0?<p className="team-muted">هنوز پیامی ثبت نشده است.</p>:null}
+      </article>):<p className="team-muted">مجوز مشاهده گفتگو برای این تیکت فعال نیست.</p>}
+      {canReadComments&&comments.length===0?<p className="team-muted">هنوز پیامی ثبت نشده است.</p>:null}
       {canComment?<form className="ticket-comment-form" onSubmit={e=>{e.preventDefault();submitComment();}}>
        <textarea value={comment} onChange={e=>setComment(e.target.value)} rows={3} maxLength={10000} placeholder="پیام خود را بنویسید..." required/>
        {canInternalCreate?<label className="ticket-inline-check"><input type="checkbox" checked={commentVisibility==="internal"} onChange={e=>setCommentVisibility(e.target.checked?"internal":"public")}/> یادداشت داخلی (فقط تیم)</label>:null}
