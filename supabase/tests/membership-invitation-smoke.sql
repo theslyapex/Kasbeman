@@ -327,11 +327,9 @@ BEGIN
 END
 $$;
 
--- An extra active owner assignment on another active member must make the
--- ownership state inconsistent and block transfer. The nested block rolls
--- back the deliberately injected bad assignment after the expected rejection.
+-- A second active owner assignment on another active member must block transfer.
 RESET ROLE;
-DO $$
+DO $
 BEGIN
   BEGIN
     INSERT INTO public.member_role_assignments (
@@ -356,7 +354,59 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL;
   END;
 END
-$$;
+$;
+
+-- An active legacy owner membership without a matching owner assignment must
+-- also make the ownership state inconsistent and block transfer.
+DO $
+BEGIN
+  BEGIN
+    UPDATE public.business_members
+    SET role_key = 'owner'
+    WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
+      AND user_id = '10000000-0000-4000-8000-000000000005'
+      AND status = 'active';
+
+    PERFORM public.transfer_business_ownership(
+      current_setting('kasbeman.test_business_id')::uuid,
+      '10000000-0000-4000-8000-000000000004'
+    );
+    RAISE EXCEPTION 'Transfer ignored an extra legacy owner membership';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+END
+$;
+
+-- The canonical owner assignment must be business-wide, not branch-scoped.
+DO $
+BEGIN
+  BEGIN
+    UPDATE public.member_role_assignments mra
+    SET branch_id = (
+      SELECT b.id
+      FROM public.branches b
+      WHERE b.business_id = mra.business_id
+        AND b.is_primary
+      LIMIT 1
+    )
+    FROM public.roles r
+    WHERE mra.business_id = current_setting('kasbeman.test_business_id')::uuid
+      AND mra.user_id = '10000000-0000-4000-8000-000000000001'
+      AND mra.status = 'active'
+      AND r.business_id = mra.business_id
+      AND r.id = mra.role_id
+      AND r.role_key = 'owner'
+      AND r.is_system;
+
+    PERFORM public.transfer_business_ownership(
+      current_setting('kasbeman.test_business_id')::uuid,
+      '10000000-0000-4000-8000-000000000004'
+    );
+    RAISE EXCEPTION 'Transfer accepted a branch-scoped owner assignment';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+END
+$;
 
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
