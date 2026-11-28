@@ -80,7 +80,7 @@ export function TicketsPanel(props:{
   </section>
   {showCreate&&canCreate?<section className="team-card">
    <h2>ثبت درخواست جدید</h2>
-   <form className="team-form" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);run(()=>createTicketAction({businessId:props.businessId,branchId:String(f.get("branchId")),title:String(f.get("title")),description:String(f.get("description")),priority:newPriority,customerId:String(f.get("customerId")??"")}),()=>{setShowCreate(false);e.currentTarget.reset();});}}>
+   <form className="team-form" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const f=new FormData(form);run(()=>createTicketAction({businessId:props.businessId,branchId:String(f.get("branchId")),title:String(f.get("title")),description:String(f.get("description")),priority:newPriority,customerId:String(f.get("customerId")??"")}),()=>{setShowCreate(false);form.reset();});}}>
     <label className="field"><span>عنوان</span><input name="title" required minLength={3} maxLength={200}/></label>
     <label className="field"><span>شرح درخواست</span><textarea name="description" required maxLength={10000} rows={4}/></label>
     <div className="ticket-form-grid">
