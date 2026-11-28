@@ -40,6 +40,17 @@ VALUES
  (:'business_id'::uuid, '10000000-0000-4000-8000-000000000002',
   :'crm_creator_role_id'::uuid, NULL, 'active', auth.uid());
 
+-- Remove the default member role's baseline CRM read permission for this fixture
+-- so the following role-isolation assertions are meaningful.
+UPDATE public.member_role_assignments mra
+SET status='revoked', revoked_at=now()
+FROM public.roles r
+WHERE r.business_id=mra.business_id AND r.id=mra.role_id
+  AND mra.business_id=:'business_id'::uuid
+  AND mra.user_id='10000000-0000-4000-8000-000000000002'
+  AND mra.status='active' AND mra.branch_id IS NULL
+  AND r.role_key='member';
+
 -- Reader can see customers but cannot change or create them.
 RESET ROLE;
 SET ROLE authenticated;
