@@ -8,4 +8,5 @@ psql -v ON_ERROR_STOP=1 \
   -f supabase/drafts/rbac_role_assignment_hardening.sql \
   -f supabase/drafts/membership_invitation_hardening.sql \
   -f supabase/drafts/sales_inventory_core.sql \
-  -f supabase/tests/sales-inventory-smoke.sql
+  -f supabase/tests/sales-inventory-smoke.sql \
+  -f supabase/tests/membership-invitation-smoke.sql
