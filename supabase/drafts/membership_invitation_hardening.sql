@@ -169,8 +169,7 @@ begin
    and r.role_key = 'owner'
    and r.status = 'active'
   where bm.business_id = p_business_id
-    and bm.status = 'active'
-    and bm.role_key = 'owner';
+    and bm.status = 'active';
 
   if v_owner_count <> 1 or v_actor_owner_count <> 1 then
     raise exception 'Ownership state is inconsistent; contact support before transfer'
