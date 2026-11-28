@@ -249,14 +249,16 @@ create policy tickets_insert_permission on public.tickets for insert to authenti
   and requester_user_id=(select auth.uid())
   and private.has_business_permission(business_id,'tickets.create',branch_id));
 create policy tickets_update_permission on public.tickets for update to authenticated
- using (private.has_business_permission(business_id,'tickets.update',branch_id)
-     or private.has_business_permission(business_id,'tickets.assign',branch_id)
-     or private.has_business_permission(business_id,'tickets.status.manage',branch_id)
-     or private.has_business_permission(business_id,'tickets.delete',branch_id))
- with check (private.has_business_permission(business_id,'tickets.update',branch_id)
-     or private.has_business_permission(business_id,'tickets.assign',branch_id)
-     or private.has_business_permission(business_id,'tickets.status.manage',branch_id)
-     or private.has_business_permission(business_id,'tickets.delete',branch_id));
+ using (private.has_business_permission(business_id,'tickets.read',branch_id)
+    and (private.has_business_permission(business_id,'tickets.update',branch_id)
+      or private.has_business_permission(business_id,'tickets.assign',branch_id)
+      or private.has_business_permission(business_id,'tickets.status.manage',branch_id)
+      or private.has_business_permission(business_id,'tickets.delete',branch_id)))
+ with check (private.has_business_permission(business_id,'tickets.read',branch_id)
+    and (private.has_business_permission(business_id,'tickets.update',branch_id)
+      or private.has_business_permission(business_id,'tickets.assign',branch_id)
+      or private.has_business_permission(business_id,'tickets.status.manage',branch_id)
+      or private.has_business_permission(business_id,'tickets.delete',branch_id)));
 
 create policy ticket_comments_select_permission on public.ticket_comments for select to authenticated
  using (exists(select 1 from public.tickets t
