@@ -22,6 +22,7 @@ class _TeamScreenState extends State<TeamScreen> {
   List<Map<String, dynamic>> _invitations = [];
   List<Map<String, dynamic>> _customRoles = [];
   List<Map<String, dynamic>> _roleAssignments = [];
+  List<Map<String, dynamic>> _branches = [];
 
   String get _businessId => widget.membership.businessId;
   bool get _canInvite => widget.permissions.contains('team.members.invite');
@@ -50,7 +51,15 @@ class _TeamScreenState extends State<TeamScreen> {
               .eq('status', 'active')
               .order('name')
           : <Map<String, dynamic>>[];
-      final roleAssignments = (_canAssignRoles ||
+      final branches = _canAssignRoles
+          ? await _client.from('branches')
+              .select('id,name,is_primary')
+              .eq('business_id', _businessId)
+              .eq('status', 'active')
+              .order('is_primary', ascending: false)
+              .order('name')
+          : <Map<String, dynamic>>[];
+      final roleAssignments = (_canAssignRoles || _canManageMembers ||
               widget.permissions.contains('team.members.read'))
           ? await _client.from('member_role_assignments')
               .select('id,user_id,role_id,branch_id,status')
@@ -63,6 +72,7 @@ class _TeamScreenState extends State<TeamScreen> {
         _invitations = List<Map<String, dynamic>>.from(invitations);
         _customRoles = List<Map<String, dynamic>>.from(customRoles);
         _roleAssignments = List<Map<String, dynamic>>.from(roleAssignments);
+        _branches = List<Map<String, dynamic>>.from(branches);
         _loading = false;
       });
     } catch (_) {
@@ -163,19 +173,44 @@ class _TeamScreenState extends State<TeamScreen> {
       return;
     }
     String? selectedRoleId;
+    String selectedBranchId = '__business__';
     final accepted = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('تخصیص نقش سفارشی'),
-          content: DropdownButtonFormField<String>(
-            initialValue: selectedRoleId,
-            decoration: const InputDecoration(labelText: 'نقش'),
-            items: _customRoles.map((role) => DropdownMenuItem(
-              value: role['id'] as String,
-              child: Text(role['name'] as String),
-            )).toList(),
-            onChanged: (value) => setDialogState(() => selectedRoleId = value),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: selectedRoleId,
+                decoration: const InputDecoration(labelText: 'نقش'),
+                items: _customRoles.map((role) => DropdownMenuItem(
+                  value: role['id'] as String,
+                  child: Text(role['name'] as String),
+                )).toList(),
+                onChanged: (value) => setDialogState(() => selectedRoleId = value),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: selectedBranchId,
+                decoration: const InputDecoration(labelText: 'محدوده دسترسی'),
+                items: [
+                  const DropdownMenuItem(
+                    value: '__business__',
+                    child: Text('کل کسب‌وکار'),
+                  ),
+                  ..._branches.map((branch) => DropdownMenuItem(
+                    value: branch['id'] as String,
+                    child: Text((branch['name'] as String) +
+                        (branch['is_primary'] == true ? ' · اصلی' : '')),
+                  )),
+                ],
+                onChanged: (value) => setDialogState(
+                  () => selectedBranchId = value ?? '__business__',
+                ),
+              ),
+            ],
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('انصراف')),
@@ -194,7 +229,7 @@ class _TeamScreenState extends State<TeamScreen> {
         'business_id': _businessId,
         'user_id': member['user_id'],
         'role_id': selectedRoleId,
-        'branch_id': null,
+        'branch_id': selectedBranchId == '__business__' ? null : selectedBranchId,
         'status': 'active',
         'assigned_by': _client.auth.currentUser!.id,
       });
@@ -213,13 +248,14 @@ class _TeamScreenState extends State<TeamScreen> {
     }
   }
 
-  Future<void> _revokeRoleAssignment(String assignmentId, String roleName) async {
+  Future<void> _revokeRoleAssignment(
+      String assignmentId, String roleName, String scopeLabel) async {
     if (!_canManageMembers) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('لغو تخصیص نقش'),
-        content: Text('نقش «$roleName» از این عضو گرفته شود؟'),
+        content: Text('نقش «$roleName» در محدوده «$scopeLabel» از این عضو گرفته شود؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('انصراف')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('لغو نقش')),
@@ -387,10 +423,16 @@ class _TeamScreenState extends State<TeamScreen> {
                           children: assignments.map((assignment) {
                             final role = _customRoles.where((item) => item['id'] == assignment['role_id']);
                             final roleName = role.isEmpty ? 'نقش سفارشی' : role.first['name'] as String;
+                            final branchId = assignment['branch_id'] as String?;
+                            final branch = _branches.where((item) => item['id'] == branchId);
+                            final scopeLabel = branchId == null
+                                ? 'کل کسب‌وکار'
+                                : branch.isEmpty ? 'شعبه' : branch.first['name'] as String;
                             return ActionChip(
-                              label: Text(roleName, style: const TextStyle(fontSize: 10)),
-                              onPressed: _canManageMembers && assignment['branch_id'] == null
-                                  ? () => _revokeRoleAssignment(assignment['id'] as String, roleName)
+                              label: Text('$roleName · $scopeLabel', style: const TextStyle(fontSize: 10)),
+                              onPressed: _canManageMembers
+                                  ? () => _revokeRoleAssignment(
+                                      assignment['id'] as String, roleName, scopeLabel)
                                   : null,
                             );
                           }).toList(),
