@@ -242,7 +242,7 @@ $$;
 -- The trigger is a second line of defence even against privileged SQL paths:
 -- an owner must use a dedicated ownership-transfer flow, never member suspension.
 RESET ROLE;
-DO $
+DO $$
 DECLARE
   v_owner_role_assignment_id uuid;
 BEGIN
@@ -272,6 +272,6 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL;
   END;
 END
-$;
+$$;
 
 SELECT 'Membership lifecycle and invitation hardening checks passed.' AS result;
