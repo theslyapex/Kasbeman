@@ -69,6 +69,8 @@ export default async function BusinessMembersPage({
         invitations={invitations ?? []}
         canInvite={permissionKeys.has("team.members.invite")}
         canTransfer={permissionKeys.has("business.ownership.transfer")}
+        canManageMembers={permissionKeys.has("team.members.manage")}
+        currentUserId={auth.user.id}
       />
     </main>
   );
