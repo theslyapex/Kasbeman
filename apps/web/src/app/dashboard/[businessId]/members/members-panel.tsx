@@ -23,7 +23,7 @@ type MemberRoleAssignment = {
   branchName: string | null;
   status: string;
 };
-type AssignableRole = { id: string; name: string; description: string | null };
+type AssignableRole = { id: string; name: string; description: string | null; permissionLabels: string[] };
 type BranchOption = { id: string; name: string; is_primary: boolean; status: string; code: string | null };
 
 export function MembersPanel({
@@ -154,6 +154,19 @@ export function MembersPanel({
                         </option>
                       ))}
                     </select>
+                    {selectedRoleByMember[member.user_id] ? (() => {
+                      const selectedRole = assignableRoles.find((role) => role.id === selectedRoleByMember[member.user_id]);
+                      if (!selectedRole) return null;
+                      const visible = selectedRole.permissionLabels.slice(0, 6);
+                      const remaining = selectedRole.permissionLabels.length - visible.length;
+                      return (
+                        <small className="team-muted" style={{ flexBasis: "100%" }}>
+                          مجوزهای این نقش: {visible.join("، ") || "بدون مجوز ثبت‌شده"}
+                          {remaining > 0 ? ` و ${remaining} مورد دیگر` : ""}.
+                          این مجوزها فقط در محدوده انتخاب‌شده اعمال می‌شوند.
+                        </small>
+                      );
+                    })() : null}
                     <button
                       type="button"
                       disabled={busy || !selectedRoleByMember[member.user_id]}
