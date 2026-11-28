@@ -35,6 +35,12 @@ BEGIN
     RAISE EXCEPTION 'Authenticated role can directly mutate invitation state';
   END IF;
 
+  IF has_column_privilege(
+    'authenticated', 'public.member_role_assignments', 'role_id', 'UPDATE'
+  ) THEN
+    RAISE EXCEPTION 'Authenticated role can directly rewrite role assignments';
+  END IF;
+
   BEGIN
     INSERT INTO public.business_invitations (
       business_id, email, role_key, status, invited_by, token_hash, expires_at
