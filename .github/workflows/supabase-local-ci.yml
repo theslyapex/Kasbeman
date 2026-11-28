@@ -1,0 +1,52 @@
+name: Kasbeman Local Supabase CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "foundation/**"
+    paths:
+      - "supabase/**"
+      - "scripts/test-postgres-schema.sh"
+      - "scripts/test-postgres-concurrency.sh"
+      - "scripts/test-supabase-local.sh"
+      - ".github/workflows/supabase-local-ci.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "supabase/**"
+      - "scripts/test-postgres-schema.sh"
+      - "scripts/test-postgres-concurrency.sh"
+      - "scripts/test-supabase-local.sh"
+      - ".github/workflows/supabase-local-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-supabase-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  local-supabase:
+    name: Supabase Auth, Data API and PostgreSQL 17
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.67.1
+
+      - name: Install PostgreSQL client and JSON tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client jq
+
+      - name: Run isolated local Supabase integration tests
+        run: bash scripts/test-supabase-local.sh
