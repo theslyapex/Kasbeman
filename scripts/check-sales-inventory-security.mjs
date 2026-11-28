@@ -1,7 +1,28 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
 
-const file = "supabase/drafts/sales_inventory_core.sql";
-const sql = await readFile(file, "utf8");
+const migrationNames = (await readdir("supabase/migrations"))
+  .filter((name) => /^\d+_sales_inventory_core\.sql$/.test(name));
+if (migrationNames.length !== 1) {
+  console.error("Expected exactly one canonical sales/inventory migration, found " + migrationNames.length + ".");
+  process.exit(1);
+}
+
+const sql = await readFile(join("supabase/migrations", migrationNames[0]), "utf8");
+const draft = await readFile("supabase/drafts/sales_inventory_core.sql", "utf8");
+const sqlBody = (source) => {
+  const start = source.indexOf("begin;");
+  const end = source.lastIndexOf("commit;");
+  return start >= 0 && end > start ? source.slice(start, end + "commit;".length).trim() : "";
+};
+if (!sqlBody(sql) || sqlBody(sql) !== sqlBody(draft)) {
+  console.error("Canonical sales/inventory migration SQL does not match the reviewed draft.");
+  process.exit(1);
+}
+if (/REVIEW DRAFT/i.test(sql.slice(0, 500))) {
+  console.error("Canonical sales/inventory migration still has a draft header.");
+  process.exit(1);
+}
 const failures = [];
 const tables = [...sql.matchAll(/create table public\.([a-z_]+)\s*\(/gi)].map((match) => match[1]);
 const policies = [...sql.matchAll(/create policy [a-z_]+ on public\.([a-z_]+)/gi)].map((match) => match[1]);
