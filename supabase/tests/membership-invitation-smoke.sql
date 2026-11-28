@@ -804,4 +804,54 @@ BEGIN
 END
 $role_assignment_escalation_test$;
 
+-- Branch-scoped role grants must be effective only in their assigned branch.
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000004';
+
+SELECT id AS branch_scope_primary_id
+FROM public.branches
+WHERE business_id = current_setting('kasbeman.test_business_id')::uuid
+  AND is_primary AND status = 'active'
+LIMIT 1 \gset
+SELECT set_config('kasbeman.test_branch_scope_primary_id', :'branch_scope_primary_id', false);
+
+INSERT INTO public.branches (business_id, name, code, is_primary, status)
+VALUES (
+  current_setting('kasbeman.test_business_id')::uuid,
+  'شعبه دوم آزمون', 'BRANCH-SCOPE-TEST', false, 'active'
+) RETURNING id AS branch_scope_other_id \gset
+SELECT set_config('kasbeman.test_branch_scope_other_id', :'branch_scope_other_id', false);
+
+INSERT INTO public.member_role_assignments (
+  business_id, user_id, role_id, branch_id, status, assigned_by
+) VALUES (
+  current_setting('kasbeman.test_business_id')::uuid,
+  '10000000-0000-4000-8000-000000000005'::uuid,
+  current_setting('kasbeman.test_custom_role_id')::uuid,
+  current_setting('kasbeman.test_branch_scope_primary_id')::uuid,
+  'active', auth.uid()
+);
+
+RESET ROLE;
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000005';
+
+DO $branch_role_scope_test$
+DECLARE
+  v_business_id uuid := current_setting('kasbeman.test_business_id')::uuid;
+  v_primary_branch_id uuid := current_setting('kasbeman.test_branch_scope_primary_id')::uuid;
+  v_other_branch_id uuid := current_setting('kasbeman.test_branch_scope_other_id')::uuid;
+BEGIN
+  IF NOT private.has_business_permission(v_business_id, 'sales.orders.read', v_primary_branch_id) THEN
+    RAISE EXCEPTION 'Branch-scoped role did not grant permission in its assigned branch';
+  END IF;
+  IF private.has_business_permission(v_business_id, 'sales.orders.read', NULL) THEN
+    RAISE EXCEPTION 'Branch-scoped role leaked permission to the whole business';
+  END IF;
+  IF private.has_business_permission(v_business_id, 'sales.orders.read', v_other_branch_id) THEN
+    RAISE EXCEPTION 'Branch-scoped role leaked permission into another branch';
+  END IF;
+END
+$branch_role_scope_test$;
 SELECT 'Membership lifecycle and invitation hardening checks passed.' AS result;
