@@ -49,13 +49,13 @@ class _InventoryScreenState extends State<InventoryScreen>
   void _reload() {
     _productsFuture = _permissions.canReadItems
         ? _repository.fetchProducts(widget.membership.businessId)
-        : Future.error(StateError('inventory.items.read permission required'));
+        : Future.value(<InventoryProduct>[]);
     _balancesFuture = _permissions.canReadStock
         ? _repository.fetchBalances(
             businessId: widget.membership.businessId,
             branchId: widget.branch.id,
           )
-        : Future.error(StateError('inventory.stock.read permission required'));
+        : Future.value(<InventoryBalance>[]);
   }
 
   Future<void> _openHistory() async {

@@ -34,7 +34,11 @@ class _SalesScreenState extends State<SalesScreen> {
     super.initState();
     _data = widget.permissions.contains('sales.invoices.manage')
         ? _load()
-        : Future.error(StateError('sales.invoices.manage permission required'));
+        : Future.value((
+            products: <InventoryProduct>[],
+            warehouses: <InventoryWarehouse>[],
+            customers: <CustomerRecord>[],
+          ));
   }
 
   Future<({

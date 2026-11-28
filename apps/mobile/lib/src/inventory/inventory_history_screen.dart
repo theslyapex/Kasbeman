@@ -32,7 +32,7 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
     if (widget.permissions.contains('inventory.stock.read')) {
       _load();
     } else {
-      _future = Future.error(StateError('inventory.stock.read permission required'));
+      _future = Future.value(<InventoryMovement>[]);
     }
   }
 

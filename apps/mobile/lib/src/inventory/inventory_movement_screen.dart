@@ -32,7 +32,10 @@ class _InventoryMovementScreenState extends State<InventoryMovementScreen> {
     super.initState();
     _data = widget.permissions.contains('inventory.stock.manage')
         ? _load()
-        : Future.error(StateError('inventory.stock.manage permission required'));
+        : Future.value((
+            products: <InventoryProduct>[],
+            warehouses: <InventoryWarehouse>[],
+          ));
   }
 
   Future<({List<InventoryProduct> products, List<InventoryWarehouse> warehouses})>

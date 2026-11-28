@@ -32,7 +32,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     if (widget.permissions.contains('sales.invoices.read')) {
       _load();
     } else {
-      _future = Future.error(StateError('sales.invoices.read permission required'));
+      _future = Future.value(<SaleRecord>[]);
     }
     _search.addListener(() => setState(() {}));
   }
