@@ -20,6 +20,10 @@ type Event = {id:string;ticket_id:string;actor_user_id:string;event_type:string;
 
 const statusLabels:Record<string,string> = {open:"باز",in_progress:"در حال انجام",waiting:"در انتظار",resolved:"حل‌شده",closed:"بسته"};
 const priorityLabels:Record<string,string> = {low:"کم",normal:"عادی",high:"زیاد",urgent:"فوری"};
+const eventLabels:Record<string,string> = {
+ created:"تیکت ثبت شد", status_changed:"وضعیت تغییر کرد", assignee_changed:"مسئول تغییر کرد",
+ archived:"تیکت بایگانی شد", comment_added:"پیام جدید ثبت شد", content_updated:"محتوای تیکت ویرایش شد",
+};
 
 export function TicketsPanel(props:{
  businessId:string;tickets:Ticket[];branches:Branch[];members:Member[];customers:Customer[];
@@ -146,7 +150,7 @@ export function TicketsPanel(props:{
        <button className="form-submit compact-submit" disabled={busy||!comment.trim()} type="submit">ارسال پیام</button>
       </form>:null}
      </div>
-     <div className="ticket-history"><h3>تاریخچه عملیات</h3>{events.slice(0,12).map(ev=><p key={ev.id}><small>{new Date(ev.created_at).toLocaleString("fa-IR")}</small> · {ev.event_type}</p>)}</div>
+     <div className="ticket-history"><h3>تاریخچه عملیات</h3>{events.slice(0,12).map(ev=><p key={ev.id}><small>{new Date(ev.created_at).toLocaleString("fa-IR")}</small> · {eventLabels[ev.event_type]??"به‌روزرسانی تیکت"}</p>)}</div>
     </>:<div className="ticket-empty-detail"><h2>یک تیکت را انتخاب کنید</h2><p>برای مشاهده جزئیات، گفتگو و تاریخچه، یکی از تیکت‌های فهرست را انتخاب کنید.</p></div>}
    </section>
   </div>
