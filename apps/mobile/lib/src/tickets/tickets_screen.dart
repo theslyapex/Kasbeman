@@ -59,12 +59,14 @@ class _TicketsScreenState extends State<TicketsScreen> {
 
   Future<void> _loadDetail(String id) async {
     try {
-      final r=await Future.wait([
-        _db.from('ticket_comments').select('id,ticket_id,author_user_id,body,visibility,created_at').eq('business_id',_businessId).eq('ticket_id',id).order('created_at'),
-        _db.from('ticket_events').select('id,ticket_id,actor_user_id,event_type,payload,created_at').eq('business_id',_businessId).eq('ticket_id',id).order('created_at',ascending:false).limit(25),
-      ]);
+      final comments = can('tickets.comments.read')
+        ? await _db.from('ticket_comments').select('id,ticket_id,author_user_id,body,visibility,created_at')
+            .eq('business_id',_businessId).eq('ticket_id',id).order('created_at')
+        : <Map<String,dynamic>>[];
+      final events = await _db.from('ticket_events').select('id,ticket_id,actor_user_id,event_type,payload,created_at')
+        .eq('business_id',_businessId).eq('ticket_id',id).order('created_at',ascending:false).limit(25);
       if (!mounted || _selectedId!=id) return;
-      setState(() { _comments=List<Map<String,dynamic>>.from(r[0]); _events=List<Map<String,dynamic>>.from(r[1]); });
+      setState(() { _comments=List<Map<String,dynamic>>.from(comments); _events=List<Map<String,dynamic>>.from(events); });
     } catch (_) {
       if (!mounted) return;
       setState(() { _comments=[]; _events=[]; });
@@ -141,6 +143,40 @@ class _TicketsScreenState extends State<TicketsScreen> {
     body.dispose();
   }
 
+  Future<void> _edit(Map<String,dynamic> t) async {
+    final title = TextEditingController(text: t['title'] as String);
+    final description = TextEditingController(text: t['description'] as String);
+    var priority = t['priority'] as String;
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialog) => AlertDialog(
+        title: const Text('ویرایش تیکت'),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: title, maxLength: 200, decoration: const InputDecoration(labelText: 'عنوان')),
+          const SizedBox(height: 10),
+          TextField(controller: description, minLines: 3, maxLines: 6, maxLength: 10000,
+            decoration: const InputDecoration(labelText: 'شرح')),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(initialValue: priority, decoration: const InputDecoration(labelText: 'اولویت'),
+            items: priorities.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
+            onChanged: (v) => setDialog(() => priority = v ?? 'normal')),
+        ])),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ذخیره')),
+        ],
+      ),
+    ));
+    if (ok == true) {
+      if (title.text.trim().length < 3 || description.text.trim().isEmpty) {
+        _toast('عنوان و شرح تیکت را کامل کنید.');
+      } else {
+        await _patch(t, {'title': title.text.trim(), 'description': description.text.trim(), 'priority': priority}, 'تغییرات ذخیره شد.');
+      }
+    }
+    title.dispose();
+    description.dispose();
+  }
+
   Future<void> _archive(Map<String,dynamic> t) async {
     final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('بایگانی تیکت؟'),
       content:const Text('تیکت بایگانی شود؟'),actions:[
@@ -200,6 +236,11 @@ class _TicketsScreenState extends State<TicketsScreen> {
       ],
       if(can('tickets.delete')&&(status=='resolved'||status=='closed')) ...[
         const SizedBox(height:10),OutlinedButton.icon(onPressed:_busy?null:()=>_archive(t),icon:const Icon(Icons.archive_outlined),label:const Text('بایگانی تیکت')),
+      ],
+      if (can('tickets.update')) ...[
+        const SizedBox(height: 10),
+        OutlinedButton.icon(onPressed: _busy ? null : () => _edit(t),
+          icon: const Icon(Icons.edit_outlined), label: const Text('ویرایش محتوا')),
       ],
       const Divider(height:28),
       Row(children:[Expanded(child:Text('گفتگو',style:Theme.of(context).textTheme.titleSmall)),
