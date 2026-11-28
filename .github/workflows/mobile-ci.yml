@@ -55,7 +55,7 @@ jobs:
 
       - name: Test
         working-directory: apps/mobile
-        run: flutter test --exclude-tags=local-supabase-e2e
+        run: flutter test
 
       - name: Verify Android debug build
         working-directory: apps/mobile
