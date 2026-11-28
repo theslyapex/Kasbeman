@@ -101,7 +101,7 @@ jobs:
           pnpm --filter @kasbeman/web dev -- --hostname 127.0.0.1 > /tmp/kasbeman-next.log 2>&1 &
           echo $! > /tmp/kasbeman-next.pid
           for attempt in $(seq 1 60); do
-            if curl --silent --fail http://127.0.0.1:3000/login >/dev/null; then
+            if curl --max-time 5 --silent --fail http://127.0.0.1:3000/ >/dev/null; then
               echo "Next.js is ready."
               exit 0
             fi
