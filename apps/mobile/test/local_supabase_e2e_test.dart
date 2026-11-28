@@ -55,7 +55,7 @@ void main() {
       final signupButton = find.text('ایجاد حساب کسبمن');
       await tester.ensureVisible(signupButton);
       await tester.tap(signupButton);
-      await _pumpUntilVisible(tester, find.text('انتخاب فضای کاری'));
+      await _pumpUntilVisible(tester, find.text('ساخت اولین کسب‌وکار'));
 
       final createFirstBusiness = find.text('ساخت اولین کسب‌وکار');
       await tester.ensureVisible(createFirstBusiness);
@@ -72,6 +72,20 @@ void main() {
       await _pumpUntilVisible(tester, find.text(businessName));
 
       expect(find.text('نقش شما: مالک'), findsOneWidget);
+
+      final signOutButton = find.byTooltip('خروج از حساب');
+      await tester.tap(signOutButton);
+      await _pumpUntilVisible(tester, find.text('خوش برگشتی'));
+
+      final loginFields = find.byType(TextFormField);
+      expect(loginFields, findsNWidgets(2));
+      await tester.enterText(loginFields.at(0), email);
+      await tester.enterText(loginFields.at(1), password);
+      final loginButton = find.text('ورود به کسبمن');
+      await tester.ensureVisible(loginButton);
+      await tester.tap(loginButton);
+      await _pumpUntilVisible(tester, find.text('انتخاب فضای کاری'));
+      await _pumpUntilVisible(tester, find.text(businessName));
 
       await Supabase.instance.client.auth.signOut();
     },
