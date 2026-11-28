@@ -19,9 +19,11 @@ type MemberRoleAssignment = {
   role_id: string;
   roleName: string;
   branch_id: string | null;
+  branchName: string | null;
   status: string;
 };
 type AssignableRole = { id: string; name: string; description: string | null };
+type BranchOption = { id: string; name: string; is_primary: boolean };
 
 export function MembersPanel({
   businessId,
@@ -29,6 +31,7 @@ export function MembersPanel({
   invitations,
   memberAssignments,
   assignableRoles,
+  branches,
   canAssignRoles,
   canInvite,
   canTransfer,
@@ -40,6 +43,7 @@ export function MembersPanel({
   invitations: Invitation[];
   memberAssignments: MemberRoleAssignment[];
   assignableRoles: AssignableRole[];
+  branches: BranchOption[];
   canAssignRoles: boolean;
   canInvite: boolean;
   canTransfer: boolean;
@@ -50,6 +54,7 @@ export function MembersPanel({
   const [result, setResult] = useState<TeamActionResult>({});
   const [token, setToken] = useState("");
   const [selectedRoleByMember, setSelectedRoleByMember] = useState<Record<string, string>>({});
+  const [selectedBranchByMember, setSelectedBranchByMember] = useState<Record<string, string>>({});
 
   function run(action: () => Promise<TeamActionResult>) {
     startTransition(async () => {
@@ -105,14 +110,15 @@ export function MembersPanel({
                 <small dir="ltr">{member.user_id}</small>
                 {memberAssignments.filter((assignment) => assignment.user_id === member.user_id).map((assignment) => (
                   <small key={assignment.id}>
-                    {assignment.roleName}{assignment.branch_id ? " · نقش شعبه‌ای" : " · نقش سراسری"}
-                    {canManageMembers && assignment.branch_id === null ? (
+                    {assignment.roleName}{assignment.branch_id ? " · " + (assignment.branchName ?? "شعبه") : " · کل کسب‌وکار"}
+                    {canManageMembers ? (
                       <button
                         type="button"
                         className="text-danger"
                         disabled={busy}
                         onClick={() => {
-                          if (!window.confirm(`تخصیص نقش «${assignment.roleName}» لغو شود؟`)) return;
+                          const scopeLabel = assignment.branch_id ? assignment.branchName ?? "شعبه" : "کل کسب‌وکار";
+                          if (!window.confirm(`نقش «${assignment.roleName}» در محدوده «${scopeLabel}» لغو شود؟`)) return;
                           run(() => revokeMemberRoleAssignmentAction({ businessId, assignmentId: assignment.id }));
                         }}
                       >لغو نقش</button>
@@ -131,14 +137,30 @@ export function MembersPanel({
                         <option value={role.id} key={role.id}>{role.name}</option>
                       ))}
                     </select>
+                    <select
+                      aria-label="محدوده تخصیص نقش"
+                      value={selectedBranchByMember[member.user_id] ?? ""}
+                      onChange={(event) => setSelectedBranchByMember((current) => ({ ...current, [member.user_id]: event.target.value }))}
+                    >
+                      <option value="">کل کسب‌وکار</option>
+                      {branches.map((branch) => (
+                        <option value={branch.id} key={branch.id}>
+                          {branch.name}{branch.is_primary ? " · اصلی" : ""}
+                        </option>
+                      ))}
+                    </select>
                     <button
                       type="button"
                       disabled={busy || !selectedRoleByMember[member.user_id]}
                       onClick={() => {
                         const roleId = selectedRoleByMember[member.user_id];
                         if (!roleId) return;
-                        run(() => assignCustomRoleAction({ businessId, targetUserId: member.user_id, roleId }));
+                        const branchId = selectedBranchByMember[member.user_id] || null;
+                        run(() => assignCustomRoleAction({
+                          businessId, targetUserId: member.user_id, roleId, branchId,
+                        }));
                         setSelectedRoleByMember((current) => ({ ...current, [member.user_id]: "" }));
+                        setSelectedBranchByMember((current) => ({ ...current, [member.user_id]: "" }));
                       }}
                     >تخصیص</button>
                   </div>
