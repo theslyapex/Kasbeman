@@ -20,11 +20,14 @@ class _TeamScreenState extends State<TeamScreen> {
   String? _error;
   List<Map<String, dynamic>> _members = [];
   List<Map<String, dynamic>> _invitations = [];
+  List<Map<String, dynamic>> _customRoles = [];
+  List<Map<String, dynamic>> _roleAssignments = [];
 
   String get _businessId => widget.membership.businessId;
   bool get _canInvite => widget.permissions.contains('team.members.invite');
   bool get _canTransfer => widget.permissions.contains('business.ownership.transfer');
   bool get _canManageMembers => widget.permissions.contains('team.members.manage');
+  bool get _canAssignRoles => widget.permissions.contains('team.roles.assign');
 
   @override
   void initState() { super.initState(); _load(); }
@@ -39,10 +42,27 @@ class _TeamScreenState extends State<TeamScreen> {
           .select('id,email,role_key,status,expires_at')
           .eq('business_id', _businessId)
           .order('created_at', ascending: false).limit(50);
+      final customRoles = _canAssignRoles
+          ? await _client.from('roles')
+              .select('id,name,description,status')
+              .eq('business_id', _businessId)
+              .eq('is_system', false)
+              .eq('status', 'active')
+              .order('name')
+          : <Map<String, dynamic>>[];
+      final roleAssignments = (_canAssignRoles || _canManageMembers ||
+              widget.permissions.contains('team.members.read'))
+          ? await _client.from('member_role_assignments')
+              .select('id,user_id,role_id,branch_id,status')
+              .eq('business_id', _businessId)
+              .eq('status', 'active')
+          : <Map<String, dynamic>>[];
       if (!mounted) return;
       setState(() {
         _members = List<Map<String, dynamic>>.from(members);
         _invitations = List<Map<String, dynamic>>.from(invitations);
+        _customRoles = List<Map<String, dynamic>>.from(customRoles);
+        _roleAssignments = List<Map<String, dynamic>>.from(roleAssignments);
         _loading = false;
       });
     } catch (_) {
@@ -135,6 +155,88 @@ class _TeamScreenState extends State<TeamScreen> {
     } catch (_) {
       if (mounted) _showMessage('لغو دعوت‌نامه انجام نشد.');
     } finally { if (mounted) setState(() => _busy = false); }
+  }
+
+  Future<void> _assignCustomRole(Map<String, dynamic> member) async {
+    if (!_canAssignRoles || member['status'] != 'active' ||
+        member['role_key'] == 'owner' || _customRoles.isEmpty) return;
+    String? selectedRoleId;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('تخصیص نقش سفارشی'),
+          content: DropdownButtonFormField<String>(
+            initialValue: selectedRoleId,
+            decoration: const InputDecoration(labelText: 'نقش'),
+            items: _customRoles.map((role) => DropdownMenuItem(
+              value: role['id'] as String,
+              child: Text(role['name'] as String),
+            )).toList(),
+            onChanged: (value) => setDialogState(() => selectedRoleId = value),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('انصراف')),
+            FilledButton(
+              onPressed: selectedRoleId == null ? null : () => Navigator.pop(dialogContext, true),
+              child: const Text('تخصیص نقش'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (accepted != true || selectedRoleId == null) return;
+    setState(() => _busy = true);
+    try {
+      await _client.from('member_role_assignments').insert({
+        'business_id': _businessId,
+        'user_id': member['user_id'],
+        'role_id': selectedRoleId,
+        'branch_id': null,
+        'status': 'active',
+        'assigned_by': _client.auth.currentUser!.id,
+      });
+      await _load();
+      if (mounted) _showMessage('نقش سفارشی به عضو تخصیص داده شد.');
+    } on PostgrestException catch (error) {
+      if (mounted) _showMessage(error.code == '23505'
+          ? 'این نقش قبلاً به عضو تخصیص داده شده است.'
+          : 'تخصیص نقش انجام نشد؛ مجوز و سطح دسترسی نقش بررسی شوند.');
+    } catch (_) {
+      if (mounted) _showMessage('تخصیص نقش انجام نشد.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _revokeRoleAssignment(String assignmentId, String roleName) async {
+    if (!_canManageMembers) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('لغو تخصیص نقش'),
+        content: Text('نقش «$roleName» از این عضو گرفته شود؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('لغو نقش')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _busy = true);
+    try {
+      await _client.from('member_role_assignments')
+          .update({'status': 'revoked', 'revoked_at': DateTime.now().toUtc().toIso8601String()})
+          .eq('business_id', _businessId)
+          .eq('id', assignmentId)
+          .eq('status', 'active');
+      await _load();
+      if (mounted) _showMessage('تخصیص نقش لغو شد.');
+    } on PostgrestException {
+      if (mounted) _showMessage('لغو نقش انجام نشد؛ مجوز مدیریت اعضا لازم است.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _suspendMember(Map<String, dynamic> member) async {
@@ -264,27 +366,50 @@ class _TeamScreenState extends State<TeamScreen> {
               const SizedBox(height: 18),
               Text('اعضای کسب‌وکار (${_members.length})', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
-              ..._members.map((member) => Card(child: ListTile(
-                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-                title: Text(_roleLabel(member['role_key'] as String?)),
-                subtitle: Text(member['user_id'] as String, textDirection: TextDirection.ltr, maxLines: 1, overflow: TextOverflow.ellipsis),
-                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text(member['status'] == 'active'
-                      ? 'فعال'
-                      : member['status'] == 'suspended'
-                          ? 'تعلیق‌شده'
-                          : member['status'] as String),
-                  if (_canManageMembers &&
-                      member['status'] == 'active' &&
-                      member['role_key'] != 'owner' &&
-                      member['user_id'] != _client.auth.currentUser?.id)
-                    IconButton(
-                      tooltip: 'تعلیق عضو',
-                      onPressed: _busy ? null : () => _suspendMember(member),
-                      icon: const Icon(Icons.person_off_outlined),
-                    ),
-                ]),
-              ))),
+              ..._members.map((member) {
+                final userId = member['user_id'] as String;
+                final assignments = _roleAssignments.where((item) => item['user_id'] == userId).toList();
+                return Card(child: ListTile(
+                  leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                  title: Text(_roleLabel(member['role_key'] as String?)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(userId, textDirection: TextDirection.ltr, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      if (assignments.isNotEmpty)
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 2,
+                          children: assignments.map((assignment) {
+                            final role = _customRoles.where((item) => item['id'] == assignment['role_id']);
+                            final roleName = role.isEmpty ? 'نقش سفارشی' : role.first['name'] as String;
+                            return ActionChip(
+                              label: Text(roleName, style: const TextStyle(fontSize: 10)),
+                              onPressed: _canManageMembers && assignment['branch_id'] == null
+                                  ? () => _revokeRoleAssignment(assignment['id'] as String, roleName)
+                                  : null,
+                            );
+                          }).toList(),
+                        ),
+                    ],
+                  ),
+                  trailing: PopupMenuButton<String>(
+                    enabled: !_busy,
+                    onSelected: (value) {
+                      if (value == 'assign') _assignCustomRole(member);
+                      if (value == 'suspend') _suspendMember(member);
+                    },
+                    itemBuilder: (_) => [
+                      if (_canAssignRoles && member['status'] == 'active' &&
+                          member['role_key'] != 'owner' && _customRoles.isNotEmpty)
+                        const PopupMenuItem(value: 'assign', child: Text('تخصیص نقش سفارشی')),
+                      if (_canManageMembers && member['status'] == 'active' &&
+                          member['role_key'] != 'owner' && userId != _client.auth.currentUser?.id)
+                        const PopupMenuItem(value: 'suspend', child: Text('تعلیق عضو')),
+                    ],
+                  ),
+                ));
+              }),
               const SizedBox(height: 18),
               Text('دعوت‌نامه‌ها', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
