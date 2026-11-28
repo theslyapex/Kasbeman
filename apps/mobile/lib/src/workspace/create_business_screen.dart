@@ -61,6 +61,11 @@ class _CreateBusinessScreenState extends State<CreateBusinessScreen> {
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
+    } on BusinessCreationRateLimitException {
+      if (!mounted) return;
+      setState(() {
+        _error = 'در مدت کوتاهی چند کسب‌وکار ساخته‌اید. لطفاً حدود ۱۰ دقیقه دیگر دوباره تلاش کنید.';
+      });
     } on PostgrestException catch (error) {
       if (!mounted) return;
       setState(() {
