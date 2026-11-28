@@ -325,3 +325,94 @@ export async function archiveCustomRoleAction(
   revalidatePath(`/dashboard/${businessId}/members`);
   return { notice: "نقش بایگانی شد؛ دسترسی‌های آن دیگر در بررسی مجوزها مؤثر نیستند." };
 }
+
+
+const assignRoleSchema = z.object({
+  businessId: z.string().uuid(),
+  targetUserId: z.string().uuid(),
+  roleId: z.string().uuid(),
+});
+
+export async function assignCustomRoleAction(input: {
+  businessId: string;
+  targetUserId: string;
+  roleId: string;
+}): Promise<TeamActionResult> {
+  const parsed = assignRoleSchema.safeParse(input);
+  if (!parsed.success) return { error: "اطلاعات تخصیص نقش معتبر نیست." };
+
+  const supabase = await createSupabaseServerClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) return { error: "برای ادامه وارد حساب شوید." };
+
+  const { data: role, error: roleError } = await supabase
+    .from("roles")
+    .select("id,is_system,status")
+    .eq("business_id", parsed.data.businessId)
+    .eq("id", parsed.data.roleId)
+    .maybeSingle();
+  if (roleError || !role || role.is_system || role.status !== "active") {
+    return { error: "فقط نقش سفارشی فعال قابل تخصیص است." };
+  }
+
+  const { data: member, error: memberError } = await supabase
+    .from("business_members")
+    .select("user_id,status,role_key")
+    .eq("business_id", parsed.data.businessId)
+    .eq("user_id", parsed.data.targetUserId)
+    .maybeSingle();
+  if (memberError || !member || member.status !== "active" || member.role_key === "owner") {
+    return { error: "نقش فقط به عضو فعال غیرمالک قابل تخصیص است." };
+  }
+
+  const { error } = await supabase.from("member_role_assignments").insert({
+    business_id: parsed.data.businessId,
+    user_id: parsed.data.targetUserId,
+    role_id: parsed.data.roleId,
+    branch_id: null,
+    status: "active",
+    assigned_by: auth.user.id,
+  });
+  if (error) {
+    return { error: error.code === "23505"
+      ? "این نقش قبلاً به عضو تخصیص داده شده است."
+      : "تخصیص نقش انجام نشد؛ مجوز و سطح دسترسی نقش بررسی شوند." };
+  }
+
+  revalidatePath(`/dashboard/${parsed.data.businessId}/members`);
+  revalidatePath("/dashboard");
+  return { notice: "نقش سفارشی به عضو تخصیص داده شد." };
+}
+
+const revokeRoleSchema = z.object({
+  businessId: z.string().uuid(),
+  assignmentId: z.string().uuid(),
+});
+
+export async function revokeMemberRoleAssignmentAction(input: {
+  businessId: string;
+  assignmentId: string;
+}): Promise<TeamActionResult> {
+  const parsed = revokeRoleSchema.safeParse(input);
+  if (!parsed.success) return { error: "شناسه تخصیص نقش معتبر نیست." };
+
+  const supabase = await createSupabaseServerClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) return { error: "برای ادامه وارد حساب شوید." };
+
+  const { data, error } = await supabase
+    .from("member_role_assignments")
+    .update({ status: "revoked", revoked_at: new Date().toISOString() })
+    .eq("business_id", parsed.data.businessId)
+    .eq("id", parsed.data.assignmentId)
+    .eq("status", "active")
+    .select("id")
+    .maybeSingle();
+  if (error || !data) {
+    return { error: "لغو تخصیص نقش انجام نشد؛ برای این عملیات به مجوز مدیریت اعضا نیاز دارید." };
+  }
+
+  revalidatePath(`/dashboard/${parsed.data.businessId}/members`);
+  revalidatePath("/dashboard");
+  return { notice: "تخصیص نقش لغو شد." };
+}
