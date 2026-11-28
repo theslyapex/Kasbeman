@@ -252,7 +252,8 @@ class _TicketsScreenState extends State<TicketsScreen> {
           Text(c['visibility']=='internal'?'یادداشت داخلی':'پیام',style:const TextStyle(fontWeight:FontWeight.bold,fontSize:11)),
           const SizedBox(height:6),Text(c['body'] as String,style:const TextStyle(height:1.7)),
         ]))),
-      if(_comments.isEmpty) const Padding(padding:EdgeInsets.symmetric(vertical:10),child:Text('هنوز پیامی ثبت نشده است.',style:TextStyle(color:Colors.white54))),
+      if(can('tickets.comments.read') && _comments.isEmpty) const Padding(padding:EdgeInsets.symmetric(vertical:10),child:Text('هنوز پیامی ثبت نشده است.',style:TextStyle(color:Colors.white54))),
+      if(!can('tickets.comments.read')) const Padding(padding:EdgeInsets.symmetric(vertical:10),child:Text('مجوز مشاهده گفتگو برای این تیکت فعال نیست.',style:TextStyle(color:Colors.white54))),
       const Divider(height:28),Text('تاریخچه',style:Theme.of(context).textTheme.titleSmall),
       ..._events.take(10).map((e)=>Padding(padding:const EdgeInsets.only(top:8),child:Row(children:[
         const Icon(Icons.history,size:15,color:Colors.white54),const SizedBox(width:8),
