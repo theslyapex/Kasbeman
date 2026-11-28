@@ -703,7 +703,7 @@ SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000004';
 DO $permission_enforcement_test$
 BEGIN
   UPDATE public.customers
-  SET name = 'مشتری ویرایش‌شده توسط ویرایشگر'
+  SET notes = 'ویرایش مجاز توسط ویرایشگر'
   WHERE id = current_setting('kasbeman.test_customer_id')::uuid;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Customer editor could not update allowed profile fields';
