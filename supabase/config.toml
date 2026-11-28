@@ -11,7 +11,6 @@ max_rows = 1000
 port = 54322
 shadow_port = 54320
 major_version = 17
-health_timeout = "3m"
 
 [db.migrations]
 enabled = true
@@ -36,16 +35,12 @@ jwt_expiry = 3600
 minimum_password_length = 8
 
 [auth.email]
-enabled = true
 enable_confirmations = false
 double_confirm_changes = false
 secure_password_change = false
 max_frequency = "1s"
 otp_length = 6
 otp_expiry = 3600
-
-[auth.sms]
-enabled = false
 
 [realtime]
 enabled = false
