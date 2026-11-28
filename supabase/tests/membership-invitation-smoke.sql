@@ -96,6 +96,7 @@ SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000005';
 SELECT public.accept_business_invitation(
   current_setting('kasbeman.test_invite_token')
 ) AS accepted_business_id \gset
+SELECT set_config('kasbeman.test_accepted_business_id', :'accepted_business_id', false);
 
 DO $$
 BEGIN
