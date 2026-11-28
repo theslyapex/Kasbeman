@@ -330,6 +330,20 @@ h1 span {
 .team-row small { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
 .team-row-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .team-row-actions select { min-height: 40px; padding: 8px 10px; border: 1px solid rgba(220,229,240,.14); border-radius: 10px; color: var(--text); background: #10233d; }
+
+.branch-create-form { max-width: 760px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); align-items: end; margin: 18px 0 22px; }
+.branch-create-form .form-submit { min-height: 44px; }
+.branch-list { margin-top: 12px; }
+.branch-row { display: grid; gap: 12px; padding: 14px; border: 1px solid rgba(220,229,240,.08); border-radius: 12px; background: rgba(3,14,27,.28); }
+.branch-row-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.branch-primary-label { padding: 3px 8px; border-radius: 8px; color: var(--cyan); background: rgba(0,216,232,.1); font-size: 10px; }
+.branch-edit-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.branch-edit-fields input, .branch-edit-fields select, .branch-create-form input { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid rgba(220,229,240,.14); border-radius: 10px; color: var(--text); background: #10233d; }
+.branch-edit-fields .field, .branch-create-form .field { display: grid; gap: 7px; color: var(--muted); font-size: 11px; }
+.branch-row .secondary-action { min-height: 38px; padding: 8px 14px; border: 1px solid rgba(0,216,232,.24); border-radius: 9px; color: var(--cyan); background: rgba(0,216,232,.08); cursor: pointer; }
+.branch-readonly-meta { display: flex; gap: 8px; color: var(--muted); }
+.team-section-heading { display: flex; justify-content: space-between; gap: 12px; }
+
 .team-muted { color: var(--muted); font-size: 11px; }
 .text-danger { border: 0; background: transparent; color: #ff9a9a; cursor: pointer; font: inherit; font-size: 11px; }
 .danger-submit { min-height: 44px; border: 1px solid rgba(255,120,120,.35); border-radius: 10px; color: #ffd1d1; background: rgba(150,35,50,.24); cursor: pointer; }
