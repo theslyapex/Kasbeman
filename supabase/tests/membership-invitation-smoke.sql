@@ -92,7 +92,7 @@ SELECT public.accept_business_invitation(
 
 DO $$
 BEGIN
-  IF :'accepted_business_id'::uuid <> current_setting('kasbeman.test_business_id')::uuid THEN
+  IF current_setting('kasbeman.test_accepted_business_id')::uuid <> current_setting('kasbeman.test_business_id')::uuid THEN
     RAISE EXCEPTION 'Invitation accepted into an unexpected business';
   END IF;
   IF NOT EXISTS (
