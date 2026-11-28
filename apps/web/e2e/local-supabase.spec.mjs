@@ -23,7 +23,7 @@ test("web signup, workspace, CRM customer and ticket flow against local Supabase
   await page.getByLabel("تکرار رمز عبور").fill(password);
   await page.getByRole("button", { name: "ایجاد حساب کسبمن" }).click();
 
-  await expect(page).toHaveURL(/\/dashboard(?:\?.*)?$/);
+  await expect(page).toHaveURL(/dashboard(?:\?.*)?$/);
   await expect(page.getByRole("heading", { name: "فضای کاری تو" })).toBeVisible();
   await page.getByRole("link", { name: "ساخت اولین فضای کاری" }).click();
 
@@ -31,7 +31,7 @@ test("web signup, workspace, CRM customer and ticket flow against local Supabase
   await page.getByLabel("شناسه لاتین کسب‌وکار").fill(businessSlug);
   await page.getByRole("button", { name: "ساخت فضای کاری" }).click();
 
-  await expect(page).toHaveURL(/\/dashboard\?created=1$/);
+  await expect(page).toHaveURL(/dashboard\?created=1$/);
   await expect(page.getByRole("heading", { name: businessName })).toBeVisible();
   await page.getByRole("link", { name: "مشتریان" }).click();
 
@@ -56,10 +56,10 @@ test("web signup, workspace, CRM customer and ticket flow against local Supabase
   await expect(page.getByText(ticketComment)).toBeVisible();
 
   await page.getByRole("button", { name: "خروج از حساب" }).click();
-  await expect(page).toHaveURL(/\\/login$/);
+  await expect(page).toHaveURL(/login$/);
   await page.getByLabel("ایمیل").fill(email);
   await page.getByLabel("رمز عبور").fill(password);
   await page.getByRole("button", { name: "ورود به حساب" }).click();
-  await expect(page).toHaveURL(/\\/dashboard(?:\\?.*)?$/);
+  await expect(page).toHaveURL(/dashboard(?:\?.*)?$/);
   await expect(page.getByRole("heading", { name: businessName })).toBeVisible();
 });
