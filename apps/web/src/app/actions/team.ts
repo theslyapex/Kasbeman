@@ -331,12 +331,14 @@ const assignRoleSchema = z.object({
   businessId: z.string().uuid(),
   targetUserId: z.string().uuid(),
   roleId: z.string().uuid(),
+  branchId: z.string().uuid().nullable().optional(),
 });
 
 export async function assignCustomRoleAction(input: {
   businessId: string;
   targetUserId: string;
   roleId: string;
+  branchId?: string | null;
 }): Promise<TeamActionResult> {
   const parsed = assignRoleSchema.safeParse(input);
   if (!parsed.success) return { error: "اطلاعات تخصیص نقش معتبر نیست." };
@@ -369,13 +371,13 @@ export async function assignCustomRoleAction(input: {
     business_id: parsed.data.businessId,
     user_id: parsed.data.targetUserId,
     role_id: parsed.data.roleId,
-    branch_id: null,
+    branch_id: parsed.data.branchId ?? null,
     status: "active",
     assigned_by: auth.user.id,
   });
   if (error) {
     return { error: error.code === "23505"
-      ? "این نقش قبلاً به عضو تخصیص داده شده است."
+      ? "این نقش قبلاً در همین محدوده به عضو تخصیص داده شده است."
       : "تخصیص نقش انجام نشد؛ مجوز و سطح دسترسی نقش بررسی شوند." };
   }
 
