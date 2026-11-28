@@ -64,7 +64,7 @@ export default async function BusinessTicketsPage({ params }: { params: Promise<
         <p>درخواست‌ها، پیگیری‌ها و سوابق گفتگو در یک فضای یکپارچه</p>
         <div className="dashboard-shortcuts">
           <Link className="back-link" href="/dashboard">بازگشت به فضای کاری</Link>
-          <Link className="back-link" href={\`/dashboard/\${businessId}/members\`}>مدیریت اعضا</Link>
+          <Link className="back-link" href={`/dashboard/${businessId}/members`}>مدیریت اعضا</Link>
         </div>
       </section>
       <TicketsPanel
