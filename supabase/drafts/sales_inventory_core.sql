@@ -27,16 +27,16 @@ on conflict do nothing;
 insert into public.role_permissions (business_id, role_id, permission_key)
 select rp.business_id, rp.role_id, 'crm.customers.read'
 from public.role_permissions rp
-where rp.permission_key in ('sales.orders.read', 'sales.orders.manage',
+where rp.permission_key in ('sales.invoices.read', 'sales.invoices.manage',
                             'crm.customers.create', 'crm.customers.update')
 on conflict do nothing;
 
 -- Manage permissions imply read access because Postgres UPDATE and the
 -- receipt transaction both need a matching SELECT policy.
 insert into public.role_permissions (business_id, role_id, permission_key)
-select rp.business_id, rp.role_id, 'sales.orders.read'
+select rp.business_id, rp.role_id, 'sales.invoices.read'
 from public.role_permissions rp
-where rp.permission_key = 'sales.orders.manage'
+where rp.permission_key = 'sales.invoices.manage'
 on conflict do nothing;
 
 create table public.products (
@@ -686,7 +686,7 @@ begin
     raise exception 'Only confirmed invoices can receive payments' using errcode = '22023';
   end if;
   if not (select private.has_business_permission(
-    v_sale.business_id, 'sales.orders.manage', v_sale.branch_id
+    v_sale.business_id, 'finance.payments.manage', v_sale.branch_id
   )) then
     raise exception 'Insufficient permission to record a receipt' using errcode = '42501';
   end if;
@@ -764,7 +764,7 @@ begin
   if not found or v_sale.status <> 'confirmed' then
     raise exception 'Confirmed invoice not found' using errcode = 'P0002';
   end if;
-  if not (select private.has_business_permission(v_sale.business_id, 'sales.orders.manage', v_sale.branch_id)) then
+  if not (select private.has_business_permission(v_sale.business_id, 'finance.payments.manage', v_sale.branch_id)) then
     raise exception 'Insufficient permission to reverse a receipt' using errcode = '42501';
   end if;
   if exists (select 1 from public.customer_receipt_reversals rv
@@ -807,7 +807,7 @@ begin
   end if;
 
   if not (select private.has_business_permission(
-    v_sale.business_id, 'sales.orders.manage', v_sale.branch_id
+    v_sale.business_id, 'sales.invoices.manage', v_sale.branch_id
   )) or not (select private.has_business_permission(
     v_sale.business_id, 'inventory.stock.manage', v_sale.branch_id
   )) then
@@ -946,7 +946,8 @@ create policy customer_receipt_reversals_select_authorized on public.customer_re
     select 1 from public.sales s
     where s.business_id = customer_receipt_reversals.business_id
       and s.id = customer_receipt_reversals.sale_id
-      and (select private.has_business_permission(s.business_id, 'sales.orders.read', s.branch_id))
+      and (select private.has_business_permission(s.business_id, 'sales.invoices.read', s.branch_id))
+      and (select private.has_business_permission(s.business_id, 'finance.payments.read', s.branch_id))
   ));
 create policy customer_receipts_select_authorized on public.customer_receipts
   for select to authenticated
@@ -955,8 +956,9 @@ create policy customer_receipts_select_authorized on public.customer_receipts
     where s.business_id = customer_receipts.business_id
       and s.id = customer_receipts.sale_id
       and (select private.has_business_permission(
-        s.business_id, 'sales.orders.read', s.branch_id
+        s.business_id, 'sales.invoices.read', s.branch_id
       ))
+      and (select private.has_business_permission(s.business_id, 'finance.payments.read', s.branch_id))
   ));
 
 create policy products_select_authorized on public.products
@@ -1015,23 +1017,23 @@ create policy stock_movements_insert_authorized on public.stock_movements
 
 create policy sales_select_authorized on public.sales
   for select to authenticated
-  using ((select private.has_business_permission(business_id, 'sales.orders.read', branch_id)));
+  using ((select private.has_business_permission(business_id, 'sales.invoices.read', branch_id)));
 create policy sales_insert_authorized on public.sales
   for insert to authenticated
   with check (
     status = 'draft'
     and created_by = (select auth.uid())
-    and (select private.has_business_permission(business_id, 'sales.orders.manage', branch_id))
+    and (select private.has_business_permission(business_id, 'sales.invoices.manage', branch_id))
   );
 create policy sales_update_draft_authorized on public.sales
   for update to authenticated
   using (
     status = 'draft'
-    and (select private.has_business_permission(business_id, 'sales.orders.manage', branch_id))
+    and (select private.has_business_permission(business_id, 'sales.invoices.manage', branch_id))
   )
   with check (
     status = 'draft'
-    and (select private.has_business_permission(business_id, 'sales.orders.manage', branch_id))
+    and (select private.has_business_permission(business_id, 'sales.invoices.manage', branch_id))
   );
 
 create policy sale_items_select_authorized on public.sale_items
@@ -1040,7 +1042,7 @@ create policy sale_items_select_authorized on public.sale_items
     select 1 from public.sales s
     where s.business_id = sale_items.business_id
       and s.id = sale_items.sale_id
-      and (select private.has_business_permission(s.business_id, 'sales.orders.read', s.branch_id))
+      and (select private.has_business_permission(s.business_id, 'sales.invoices.read', s.branch_id))
   ));
 create policy sale_items_insert_draft_authorized on public.sale_items
   for insert to authenticated
@@ -1049,7 +1051,7 @@ create policy sale_items_insert_draft_authorized on public.sale_items
     where s.business_id = sale_items.business_id
       and s.id = sale_items.sale_id
       and s.status = 'draft'
-      and (select private.has_business_permission(s.business_id, 'sales.orders.manage', s.branch_id))
+      and (select private.has_business_permission(s.business_id, 'sales.invoices.manage', s.branch_id))
   ));
 create policy sale_items_update_draft_authorized on public.sale_items
   for update to authenticated
@@ -1058,14 +1060,14 @@ create policy sale_items_update_draft_authorized on public.sale_items
     where s.business_id = sale_items.business_id
       and s.id = sale_items.sale_id
       and s.status = 'draft'
-      and (select private.has_business_permission(s.business_id, 'sales.orders.manage', s.branch_id))
+      and (select private.has_business_permission(s.business_id, 'sales.invoices.manage', s.branch_id))
   ))
   with check (exists (
     select 1 from public.sales s
     where s.business_id = sale_items.business_id
       and s.id = sale_items.sale_id
       and s.status = 'draft'
-      and (select private.has_business_permission(s.business_id, 'sales.orders.manage', s.branch_id))
+      and (select private.has_business_permission(s.business_id, 'sales.invoices.manage', s.branch_id))
   ));
 create policy sale_items_delete_draft_authorized on public.sale_items
   for delete to authenticated
@@ -1074,7 +1076,7 @@ create policy sale_items_delete_draft_authorized on public.sale_items
     where s.business_id = sale_items.business_id
       and s.id = sale_items.sale_id
       and s.status = 'draft'
-      and (select private.has_business_permission(s.business_id, 'sales.orders.manage', s.branch_id))
+      and (select private.has_business_permission(s.business_id, 'sales.invoices.manage', s.branch_id))
   ));
 
 revoke all on table public.customer_receipts from anon, authenticated;

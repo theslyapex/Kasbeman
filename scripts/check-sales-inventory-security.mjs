@@ -30,6 +30,12 @@ for (const rpc of ["record_customer_receipt", "reverse_customer_receipt", "confi
   const block = sql.slice(start, sql.indexOf("$$;", start) + 3);
   if (!/security definer/i.test(block)) failures.push(`${rpc}: expected SECURITY DEFINER`);
   if (!/private\.has_business_permission/i.test(block)) failures.push(`${rpc}: missing live permission check`);
+  const requiredPermissions = rpc === "confirm_sale"
+    ? ["sales.invoices.manage", "inventory.stock.manage"]
+    : ["finance.payments.manage"];
+  for (const permission of requiredPermissions) {
+    if (!block.includes(permission)) failures.push(`${rpc}: missing ${permission} check`);
+  }
   if (!/set search_path\s*=\s*''/i.test(block)) failures.push(`${rpc}: missing empty search_path`);
 }
 
@@ -48,7 +54,7 @@ const salesInsertPolicy = sql.slice(salesInsertPolicyStart, salesInsertPolicyEnd
 const saleItemsInsertPolicyStart = sql.indexOf("create policy sale_items_insert_draft_authorized");
 const saleItemsInsertPolicyEnd = sql.indexOf("create policy sale_items_update_draft_authorized", saleItemsInsertPolicyStart);
 const saleItemsInsertPolicy = sql.slice(saleItemsInsertPolicyStart, saleItemsInsertPolicyEnd);
-if (!salesInsertPolicy.includes("sales.orders.manage") || !saleItemsInsertPolicy.includes("sales.orders.manage")) {
+if (!salesInsertPolicy.includes("sales.invoices.manage") || !saleItemsInsertPolicy.includes("sales.invoices.manage")) {
   failures.push("create_sale_draft: required RLS insert policies are missing");
 }
 
@@ -80,4 +86,8 @@ if (failures.length) {
   process.exitCode = 1;
 } else {
   console.log(`Security structure checks passed for ${tables.length} public tables and ${securityDefinerBlocks.length} SECURITY DEFINER functions.`);
+}
+
+if (/sales\\.orders\\.(read|manage)/.test(sql)) {
+  failures.push("sales/invoice policies still use legacy sales.orders permissions");
 }

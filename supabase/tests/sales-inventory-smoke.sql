@@ -354,7 +354,44 @@ RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
 
-DO $$
+
+-- Finance-only receipt data must not be readable by stock-only or CRM-only members.
+DO $
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.customer_receipts
+    WHERE sale_id = current_setting('kasbeman.test_sale_id')::uuid
+  ) THEN
+    RAISE EXCEPTION 'Member without finance.payments.read can see customer receipts';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.customer_invoice_balance_summary
+    WHERE sale_id = current_setting('kasbeman.test_sale_id')::uuid
+  ) THEN
+    RAISE EXCEPTION 'Member without finance.payments.read can see invoice payment balances';
+  END IF;
+  BEGIN
+    PERFORM public.record_customer_receipt(
+      current_setting('kasbeman.test_sale_id')::uuid,
+      1,
+      'cash',
+      '40000000-0000-4000-8000-000000000001'
+    );
+    RAISE EXCEPTION 'Member without finance.payments.manage recorded a receipt';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    PERFORM public.reverse_customer_receipt(
+      current_setting('kasbeman.test_receipt_id')::uuid,
+      'Unauthorized reversal test'
+    );
+    RAISE EXCEPTION 'Member without finance.payments.manage reversed a receipt';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+END
+$;
+
+DO $
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.businesses WHERE slug = 'kasbeman-ci-tenant') THEN
     RAISE EXCEPTION 'Active tenant member cannot see the business';

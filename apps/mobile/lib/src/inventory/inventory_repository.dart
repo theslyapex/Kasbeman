@@ -335,6 +335,7 @@ abstract interface class InventoryRepository {
   Future<List<CustomerRecord>> fetchCustomers(
     String businessId, {
     bool includeArchived = false,
+    bool includeFinancialSummary = false,
   });
 
   Future<List<SaleRecord>> fetchCustomerSales({
@@ -455,22 +456,23 @@ class SupabaseInventoryRepository implements InventoryRepository {
   Future<List<CustomerRecord>> fetchCustomers(
     String businessId, {
     bool includeArchived = false,
+    bool includeFinancialSummary = false,
   }) async {
     var customersQuery = _client.from('customers')
         .select('id,business_id,name,phone,email,company_name,address,notes,status')
         .eq('business_id', businessId);
     if (!includeArchived) customersQuery = customersQuery.eq('status', 'active');
-    final result = await Future.wait<Object>([
-      customersQuery.order('name').limit(500),
-      _client.from('customer_purchase_summary')
-          .select('customer_id,purchase_count,total_purchases,total_received,balance_due')
-          .eq('business_id', businessId),
-    ]);
+    final customers = await customersQuery.order('name').limit(500);
+    final summaryRows = includeFinancialSummary
+        ? await _client.from('customer_purchase_summary')
+            .select('customer_id,purchase_count,total_purchases,total_received,balance_due')
+            .eq('business_id', businessId)
+        : <dynamic>[];
     final summary = <String, Map<String, dynamic>>{
-      for (final row in result[1] as List)
+      for (final row in summaryRows)
         row['customer_id'] as String: Map<String, dynamic>.from(row),
     };
-    return (result[0] as List).map((row) {
+    return customers.map((row) {
       final customer = Map<String, dynamic>.from(row);
       final totals = summary[customer['id']] ?? const <String, dynamic>{};
       customer['purchase_count'] = totals['purchase_count'] ?? 0;

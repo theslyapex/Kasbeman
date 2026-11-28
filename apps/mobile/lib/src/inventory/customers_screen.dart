@@ -23,6 +23,7 @@ class CustomersScreen extends StatefulWidget {
   bool get _canArchive => permissions.contains('crm.customers.delete');
   bool get _canCreate => permissions.contains('crm.customers.create');
   bool get _canReceive => permissions.contains('finance.payments.manage');
+  bool get _canReadPayments => permissions.contains('finance.payments.read');
   bool get _canExport => permissions.contains('reports.export');
 
   @override
@@ -49,23 +50,22 @@ class _CustomersScreenState extends State<CustomersScreen> {
     _future = widget.repository.fetchCustomers(
       widget.businessId,
       includeArchived: _showArchived,
+      includeFinancialSummary: widget._canReadPayments,
     );
   }
 
   Future<List<_CustomerLedgerEntry>> _ledgerFor(String customerId) {
     return _ledgerHistory.putIfAbsent(customerId, () async {
-      final results = await Future.wait<Object>([
-        widget.repository.fetchCustomerSales(
-          businessId: widget.businessId,
-          customerId: customerId,
-        ),
-        widget.repository.fetchCustomerReceipts(
-          businessId: widget.businessId,
-          customerId: customerId,
-        ),
-      ]);
-      final sales = results[0] as List<SaleRecord>;
-      final receipts = results[1] as List<CustomerReceiptRecord>;
+      final sales = await widget.repository.fetchCustomerSales(
+        businessId: widget.businessId,
+        customerId: customerId,
+      );
+      final receipts = widget._canReadPayments
+          ? await widget.repository.fetchCustomerReceipts(
+              businessId: widget.businessId,
+              customerId: customerId,
+            )
+          : <CustomerReceiptRecord>[];
       final entries = <_CustomerLedgerEntry>[
         for (final sale in sales)
           _CustomerLedgerEntry(
@@ -348,22 +348,22 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
     setState(() => _exportingCustomerId = customer.id);
     try {
-      final results = await Future.wait<Object>([
-        widget.repository.fetchCustomerSales(
-          businessId: widget.businessId,
-          customerId: customer.id,
-        ),
-        widget.repository.fetchCustomerReceipts(
-          businessId: widget.businessId,
-          customerId: customer.id,
-        ),
-      ]);
+      final sales = await widget.repository.fetchCustomerSales(
+        businessId: widget.businessId,
+        customerId: customer.id,
+      );
+      final receipts = widget._canReadPayments
+          ? await widget.repository.fetchCustomerReceipts(
+              businessId: widget.businessId,
+              customerId: customer.id,
+            )
+          : <CustomerReceiptRecord>[];
       final report = CustomerStatementReport.build(
         customer: customer,
         startDate: range.start,
         endDate: range.end,
-        sales: results[0] as List<SaleRecord>,
-        receipts: results[1] as List<CustomerReceiptRecord>,
+        sales: sales,
+        receipts: receipts,
       );
       if (format == 'pdf') {
         await CustomerStatementExporter.sharePdf(report);
