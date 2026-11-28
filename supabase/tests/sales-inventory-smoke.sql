@@ -58,7 +58,9 @@ VALUES (:'business_id'::uuid, 'branch-stock-reader', 'مشاهده‌گر انب
 RETURNING id AS branch_reader_role_id \gset
 
 INSERT INTO public.role_permissions (business_id, role_id, permission_key)
-VALUES (:'business_id'::uuid, :'branch_reader_role_id'::uuid, 'inventory.stock.read');
+VALUES
+  (:'business_id'::uuid, :'branch_reader_role_id'::uuid, 'inventory.stock.read'),
+  (:'business_id'::uuid, :'branch_reader_role_id'::uuid, 'inventory.items.read');
 
 INSERT INTO public.member_role_assignments
   (business_id, user_id, role_id, branch_id, status, assigned_by)

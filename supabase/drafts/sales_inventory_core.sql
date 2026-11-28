@@ -947,7 +947,10 @@ create policy customer_receipt_reversals_select_authorized on public.customer_re
     where s.business_id = customer_receipt_reversals.business_id
       and s.id = customer_receipt_reversals.sale_id
       and (select private.has_business_permission(s.business_id, 'sales.invoices.read', s.branch_id))
-      and (select private.has_business_permission(s.business_id, 'finance.payments.read', s.branch_id))
+      and (
+        (select private.has_business_permission(s.business_id, 'finance.payments.read', s.branch_id))
+        or (select private.has_business_permission(s.business_id, 'finance.payments.manage', s.branch_id))
+      )
   ));
 create policy customer_receipts_select_authorized on public.customer_receipts
   for select to authenticated
@@ -958,7 +961,10 @@ create policy customer_receipts_select_authorized on public.customer_receipts
       and (select private.has_business_permission(
         s.business_id, 'sales.invoices.read', s.branch_id
       ))
-      and (select private.has_business_permission(s.business_id, 'finance.payments.read', s.branch_id))
+      and (
+        (select private.has_business_permission(s.business_id, 'finance.payments.read', s.branch_id))
+        or (select private.has_business_permission(s.business_id, 'finance.payments.manage', s.branch_id))
+      )
   ));
 
 create policy products_select_authorized on public.products

@@ -23,7 +23,8 @@ class CustomersScreen extends StatefulWidget {
   bool get _canArchive => permissions.contains('crm.customers.delete');
   bool get _canCreate => permissions.contains('crm.customers.create');
   bool get _canReceive => permissions.contains('finance.payments.manage');
-  bool get _canReadPayments => permissions.contains('finance.payments.read');
+  bool get _canReadPayments =>
+      permissions.contains('finance.payments.read') || _canReceive;
   bool get _canExport => permissions.contains('reports.export');
 
   @override
@@ -72,7 +73,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
             date: sale.createdAt,
             amount: sale.grandTotal,
             title: 'فاکتور ${sale.saleNumber}',
-            subtitle: '${sale.items.length} قلم کالا و خدمت • مانده ${_money(sale.balanceDue)} تومان',
+            subtitle: widget._canReadPayments
+                ? '${sale.items.length} قلم کالا و خدمت • مانده ${_money(sale.balanceDue)} تومان'
+                : '${sale.items.length} قلم کالا و خدمت',
             isReceipt: false,
           ),
         for (final receipt in receipts)
