@@ -185,6 +185,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               icon: const Icon(Icons.receipt_long_outlined),
             ),
           if (_permissions.canManageSales &&
+              _permissions.canManageStock &&
               _permissions.canReadItems &&
               _permissions.canReadStock)
             IconButton(

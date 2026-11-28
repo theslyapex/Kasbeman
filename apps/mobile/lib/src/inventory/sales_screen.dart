@@ -34,6 +34,7 @@ class _SalesScreenState extends State<SalesScreen> {
     super.initState();
     _data = widget.permissions.containsAll(const [
           'sales.invoices.manage',
+          'inventory.stock.manage',
           'inventory.items.read',
           'inventory.stock.read',
         ])
@@ -71,6 +72,7 @@ class _SalesScreenState extends State<SalesScreen> {
   Widget build(BuildContext context) {
     if (!widget.permissions.containsAll(const [
           'sales.invoices.manage',
+          'inventory.stock.manage',
           'inventory.items.read',
           'inventory.stock.read',
         ])) {
