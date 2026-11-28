@@ -138,6 +138,111 @@ export async function suspendBusinessMemberAction(
 }
 
 
+
+const createBranchSchema = z.object({
+  businessId: z.string().uuid(),
+  name: z.string().trim().min(2).max(120),
+  code: z.string().trim().max(20).optional().default(""),
+});
+
+export async function createBranchAction(input: {
+  businessId: string;
+  name: string;
+  code?: string;
+}): Promise<TeamActionResult> {
+  const parsed = createBranchSchema.safeParse(input);
+  if (!parsed.success) return { error: "نام یا کد شعبه معتبر نیست." };
+
+  const normalizedCode = parsed.data.code.trim().toUpperCase();
+  if (normalizedCode && !/^[A-Z0-9-]{2,20}$/.test(normalizedCode)) {
+    return { error: "کد شعبه باید ۲ تا ۲۰ نویسه و شامل حروف انگلیسی، عدد یا خط تیره باشد." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) return { error: "برای ادامه وارد حساب شوید." };
+
+  const { error } = await supabase.from("branches").insert({
+    business_id: parsed.data.businessId,
+    name: parsed.data.name,
+    code: normalizedCode || null,
+    is_primary: false,
+    status: "active",
+  });
+  if (error) {
+    return { error: error.code === "23505"
+      ? "این کد قبلاً برای شعبه دیگری ثبت شده است."
+      : "ساخت شعبه انجام نشد؛ مجوز مدیریت شعب را بررسی کنید." };
+  }
+
+  revalidatePath(`/dashboard/${parsed.data.businessId}/members`);
+  revalidatePath("/dashboard");
+  return { notice: "شعبه جدید با موفقیت ایجاد شد." };
+}
+
+const updateBranchSchema = z.object({
+  businessId: z.string().uuid(),
+  branchId: z.string().uuid(),
+  name: z.string().trim().min(2).max(120),
+  code: z.string().trim().max(20).optional().default(""),
+  status: z.enum(["active", "inactive", "archived"]),
+});
+
+export async function updateBranchAction(input: {
+  businessId: string;
+  branchId: string;
+  name: string;
+  code?: string;
+  status: "active" | "inactive" | "archived";
+}): Promise<TeamActionResult> {
+  const parsed = updateBranchSchema.safeParse(input);
+  if (!parsed.success) return { error: "اطلاعات شعبه معتبر نیست." };
+
+  const normalizedCode = parsed.data.code.trim().toUpperCase();
+  if (normalizedCode && !/^[A-Z0-9-]{2,20}$/.test(normalizedCode)) {
+    return { error: "کد شعبه باید ۲ تا ۲۰ نویسه و شامل حروف انگلیسی، عدد یا خط تیره باشد." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) return { error: "برای ادامه وارد حساب شوید." };
+
+  const { data: existing, error: lookupError } = await supabase
+    .from("branches")
+    .select("id,is_primary")
+    .eq("business_id", parsed.data.businessId)
+    .eq("id", parsed.data.branchId)
+    .maybeSingle();
+  if (lookupError || !existing) return { error: "شعبه پیدا نشد یا دسترسی مشاهده آن را ندارید." };
+  if (existing.is_primary && parsed.data.status !== "active") {
+    return { error: "شعبه اصلی را نمی‌توان غیرفعال یا بایگانی کرد." };
+  }
+
+  const { data, error } = await supabase
+    .from("branches")
+    .update({
+      name: parsed.data.name,
+      code: normalizedCode || null,
+      status: parsed.data.status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("business_id", parsed.data.businessId)
+    .eq("id", parsed.data.branchId)
+    .select("id")
+    .maybeSingle();
+
+  if (error || !data) {
+    return { error: error?.code === "23505"
+      ? "این کد قبلاً برای شعبه دیگری ثبت شده است."
+      : "ویرایش شعبه انجام نشد؛ مجوز مدیریت شعب را بررسی کنید." };
+  }
+
+  revalidatePath(`/dashboard/${parsed.data.businessId}/members`);
+  revalidatePath("/dashboard");
+  return { notice: "تغییرات شعبه ذخیره شد." };
+}
+
+
 const customRoleSchema = z.object({
   businessId: z.string().uuid(),
   roleId: z.string().uuid().optional(),
