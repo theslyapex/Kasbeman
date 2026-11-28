@@ -61,6 +61,9 @@ jobs:
       - name: Validate sales/inventory SQL security structure
         run: node scripts/check-sales-inventory-security.mjs
 
+      - name: Validate CRM SQL security structure
+        run: node scripts/check-crm-security.mjs
+
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update
