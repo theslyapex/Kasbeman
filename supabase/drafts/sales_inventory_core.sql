@@ -248,7 +248,7 @@ create or replace function private.guard_customer_status_permission()
 returns trigger
 language plpgsql
 set search_path = ''
-as $
+as $customer_status_guard$
 begin
   if new.status is distinct from old.status
      and not (select private.has_business_permission(
@@ -259,7 +259,7 @@ begin
   end if;
   return new;
 end;
-$;
+$customer_status_guard$;
 
 revoke all on function private.guard_customer_status_permission()
   from public, anon, authenticated;
