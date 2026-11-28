@@ -45,18 +45,23 @@ BEGIN
     RAISE EXCEPTION 'Rate-limited request created a business row';
   END IF;
 
+END
+$business_creation_rate_limit$;
+
+RESET ROLE;
+
+DO $business_rate_limit_counter_persistence$
+BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM private.operation_rate_limit_counters
-    WHERE user_id = auth.uid()
+    WHERE user_id = '10000000-0000-4000-8000-000000000006'
       AND operation_key = 'business.create'
       AND attempt_count = 6
   ) THEN
     RAISE EXCEPTION 'Rate-limit counter did not persist the blocked attempt';
   END IF;
 END
-$business_creation_rate_limit$;
-
-RESET ROLE;
+$business_rate_limit_counter_persistence$;
 
 DO $business_rate_limit_acl$
 BEGIN
