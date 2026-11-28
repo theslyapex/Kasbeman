@@ -381,6 +381,25 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
   BEGIN
+    PERFORM public.create_sale_draft(
+      current_setting('kasbeman.test_business_id')::uuid,
+      current_setting('kasbeman.test_second_branch_id')::uuid,
+      current_setting('kasbeman.test_second_warehouse_id')::uuid,
+      'CI-DENIED-SALE-001',
+      jsonb_build_array(jsonb_build_object(
+        'product_id', current_setting('kasbeman.test_product_id')::uuid,
+        'quantity', 1,
+        'discount_amount', 0,
+        'tax_amount', 0
+      )),
+      NULL,
+      NULL,
+      'Must be denied to a stock-only role'
+    );
+    RAISE EXCEPTION 'Member without sales.invoices.manage created a sale';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
     PERFORM public.reverse_customer_receipt(
       current_setting('kasbeman.test_receipt_id')::uuid,
       'Unauthorized reversal test'
