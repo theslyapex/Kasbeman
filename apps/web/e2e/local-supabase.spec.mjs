@@ -19,8 +19,8 @@ test("web signup, workspace, CRM customer and ticket flow against local Supabase
 
   await page.goto("/signup");
   await page.getByLabel("ایمیل").fill(email);
-  await page.getByLabel("رمز عبور").fill(password);
-  await page.getByLabel("تکرار رمز عبور").fill(password);
+  await page.getByLabel("رمز عبور", { exact: true }).fill(password);
+  await page.getByLabel("تکرار رمز عبور", { exact: true }).fill(password);
   await page.getByRole("button", { name: "ایجاد حساب کسبمن" }).click();
 
   await expect(page).toHaveURL(/dashboard(?:\?.*)?$/);
