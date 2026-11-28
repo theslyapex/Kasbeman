@@ -109,7 +109,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
       if (title.text.trim().length<3 || desc.text.trim().isEmpty) { _toast('عنوان و شرح تیکت را کامل کنید.'); }
       else await _run(() async {
         final uid=_db.auth.currentUser?.id;
-        if(uid==null) throw const AuthException('Authentication required');
+        if(uid==null) throw StateError('Authentication required');
         await _db.from('tickets').insert({'business_id':_businessId,'branch_id':widget.branchId,'ticket_number':_number(),
           'title':title.text.trim(),'description':desc.text.trim(),'priority':priority,'requester_user_id':uid,'created_by':uid});
       },'تیکت ثبت شد.');
@@ -120,7 +120,7 @@ class _TicketsScreenState extends State<TicketsScreen> {
   Future<void> _patch(Map<String,dynamic> ticket, Map<String,dynamic> patch, String success) async {
     await _run(() async {
       final rows=await _db.from('tickets').update(patch).eq('business_id',_businessId).eq('id',ticket['id']).isFilter('archived_at',null).select('id');
-      if(rows.isEmpty) throw const PostgrestException(message:'Ticket not found or forbidden.');
+      if(rows.isEmpty) throw StateError('Ticket not found or forbidden.');
     },success);
   }
 
