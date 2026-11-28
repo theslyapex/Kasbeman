@@ -274,8 +274,8 @@ class _ManageBranchesScreenState extends State<ManageBranchesScreen> {
                               ),
                               title: Text(branch['name'] as String),
                               subtitle: Text(
-                                '\${isPrimary ? 'شعبه اصلی · ' : ''}$statusLabel'
-                                '\${branch['code'] == null ? '' : ' · \${branch['code']}'}',
+                                '${isPrimary ? 'شعبه اصلی · ' : ''}$statusLabel'
+                                '${branch['code'] == null ? '' : ' · ${branch['code']}'}',
                               ),
                               trailing: IconButton(
                                 tooltip: 'ویرایش شعبه',
