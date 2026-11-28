@@ -66,7 +66,8 @@ DECLARE
     'private.apply_stock_movement()',
     'private.log_authorization_change()',
     'private.guard_business_member_lifecycle()',
-    'private.guard_owner_role_assignment()'
+    'private.guard_owner_role_assignment()',
+    'private.consume_operation_rate_limit(text,uuid)'
   ];
 BEGIN
   FOREACH v_function IN ARRAY v_public_endpoints LOOP
