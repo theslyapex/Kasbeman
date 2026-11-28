@@ -40,14 +40,14 @@ async function authenticatedClient() {
   if (error || !data.user) return { supabase: null, user: null };
   return { supabase, user: data.user };
 }
-function refresh(businessId: string) { revalidatePath(\`/dashboard/\${businessId}/tickets\`); }
+function refresh(businessId: string) { revalidatePath(`/dashboard/${businessId}/tickets`); }
 
 export async function createTicketAction(input: unknown): Promise<TicketActionResult> {
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) return { error: "اطلاعات تیکت معتبر نیست." };
   const { supabase, user } = await authenticatedClient();
   if (!supabase || !user) return { error: "برای ادامه وارد حساب شوید." };
-  const ticketNumber = \`TK-\${Date.now().toString(36).toUpperCase()}-\${randomUUID().slice(0, 6).toUpperCase()}\`;
+  const ticketNumber = `TK-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 6).toUpperCase()}`;
   const { error } = await supabase.from("tickets").insert({
     business_id: parsed.data.businessId, branch_id: parsed.data.branchId,
     ticket_number: ticketNumber, title: parsed.data.title, description: parsed.data.description,
