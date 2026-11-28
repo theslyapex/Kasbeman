@@ -215,58 +215,7 @@ create unique index stock_movements_reference_unique
   on public.stock_movements (business_id, reference_type, reference_id, product_id, movement_type)
   where reference_type is not null and reference_id is not null;
 
--- Customer records belong to the business, not an individual branch.
--- Purchase totals are derived from confirmed sales and are not stored redundantly.
-create table public.customers (
-  id uuid primary key default gen_random_uuid(),
-  business_id uuid not null references public.businesses(id) on delete cascade,
-  name text not null,
-  phone text,
-  email text,
-  company_name text,
-  address text,
-  notes text,
-  status text not null default 'active',
-  created_by uuid not null references auth.users(id) on delete restrict,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint customers_name_length check (char_length(btrim(name)) between 2 and 160),
-  constraint customers_phone_length check (phone is null or char_length(btrim(phone)) <= 32),
-  constraint customers_email_length check (email is null or char_length(btrim(email)) <= 254),
-  constraint customers_status_check check (status in ('active', 'archived')),
-  constraint customers_business_id_id_unique unique (business_id, id)
-);
-
-create index customers_business_status_name_idx
-  on public.customers (business_id, status, name);
-create index customers_business_phone_idx
-  on public.customers (business_id, phone) where phone is not null;
-
--- A customer profile editor must not gain archive/restore rights implicitly.
--- Status transitions are a separate destructive CRM operation.
-create or replace function private.guard_customer_status_permission()
-returns trigger
-language plpgsql
-set search_path = ''
-as $customer_status_guard$
-begin
-  if new.status is distinct from old.status
-     and not (select private.has_business_permission(
-       new.business_id, 'crm.customers.delete', null
-     )) then
-    raise exception 'Insufficient permission to change customer archive status'
-      using errcode = '42501';
-  end if;
-  return new;
-end;
-$customer_status_guard$;
-
-revoke all on function private.guard_customer_status_permission()
-  from public, anon, authenticated;
-
-create trigger customers_status_permission_guard
-  before update of status on public.customers
-  for each row execute function private.guard_customer_status_permission();
+-- Customer schema, trigger and policies are owned by crm_core.sql.
 
 -- Sales are branch- and warehouse-bound. Drafts may be edited; confirmation
 -- atomically records stock-out movements and changes the sale state.
@@ -943,7 +892,6 @@ $$;
 revoke all on function public.confirm_sale(uuid) from public, anon;
 grant execute on function public.confirm_sale(uuid) to authenticated;
 
-alter table public.customers enable row level security;
 alter table public.customer_receipts enable row level security;
 alter table public.customer_receipt_reversals enable row level security;
 alter table public.products enable row level security;
@@ -953,19 +901,7 @@ alter table public.stock_movements enable row level security;
 alter table public.sales enable row level security;
 alter table public.sale_items enable row level security;
 
-create policy customers_select_authorized on public.customers
-  for select to authenticated
-  using ((select private.has_business_permission(business_id, 'crm.customers.read', null)));
-create policy customers_insert_authorized on public.customers
-  for insert to authenticated
-  with check (
-    created_by = (select auth.uid())
-    and (select private.has_business_permission(business_id, 'crm.customers.create', null))
-  );
-create policy customers_update_authorized on public.customers
-  for update to authenticated
-  using ((select private.has_business_permission(business_id, 'crm.customers.update', null)))
-  with check ((select private.has_business_permission(business_id, 'crm.customers.update', null)));
+-- Customer policies are owned by crm_core.sql.
 
 create policy customer_receipt_reversals_select_authorized on public.customer_receipt_reversals
   for select to authenticated using (exists (
@@ -1113,14 +1049,11 @@ create policy sale_items_delete_draft_authorized on public.sale_items
 
 revoke all on table public.customer_receipts from anon, authenticated;
 
-revoke all on table public.customers, public.products, public.warehouses, public.stock_balances,
+revoke all on table public.products, public.warehouses, public.stock_balances,
   public.stock_movements, public.sales, public.sale_items from anon, authenticated;
 
-grant select, insert on table public.customers to authenticated;
 grant select on table public.customer_receipts to authenticated;
 grant select on public.customer_invoice_balance_summary to authenticated;
-grant update (name, phone, email, company_name, address, notes, status)
-  on table public.customers to authenticated;
 grant select on public.customer_purchase_summary to authenticated;
 grant select, insert on table public.products to authenticated;
 grant update (sku, barcode, name, description, product_type, unit_name, sale_price, purchase_price, status)
