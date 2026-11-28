@@ -1,7 +1,7 @@
--- Kasbeman sales and inventory core — REVIEW DRAFT
--- This is intentionally stored outside supabase/migrations until it has been
--- generated through the Supabase CLI and tested against a disposable database.
--- Do not apply this draft to production as-is.
+-- Kasbeman sales and inventory core — canonical migration
+-- Generated with Supabase CLI 3.4.0 from the reviewed sales/inventory draft.
+-- Depends on the canonical CRM and ticketing migrations and existing identity/RBAC foundation.
+-- Production rollout remains gated by staging verification and explicit approval.
 
 begin;
 
