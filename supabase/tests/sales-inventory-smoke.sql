@@ -356,7 +356,7 @@ SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000002';
 
 
 -- Finance-only receipt data must not be readable by stock-only or CRM-only members.
-DO $
+DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM public.customer_receipts
@@ -408,9 +408,9 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
 END
-$;
+$$;
 
-DO $
+DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.businesses WHERE slug = 'kasbeman-ci-tenant') THEN
     RAISE EXCEPTION 'Active tenant member cannot see the business';
