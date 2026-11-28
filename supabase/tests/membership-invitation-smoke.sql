@@ -305,7 +305,7 @@ RESET ROLE;
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
 
-DO $
+DO $$
 BEGIN
   BEGIN
     PERFORM public.transfer_business_ownership(
@@ -325,13 +325,13 @@ BEGIN
   EXCEPTION WHEN invalid_parameter_value THEN NULL;
   END;
 END
-$;
+$$;
 
 -- An extra active owner assignment on another active member must make the
 -- ownership state inconsistent and block transfer. The nested block rolls
 -- back the deliberately injected bad assignment after the expected rejection.
 RESET ROLE;
-DO $
+DO $$
 BEGIN
   BEGIN
     INSERT INTO public.member_role_assignments (
@@ -356,7 +356,7 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL;
   END;
 END
-$;
+$$;
 
 SET ROLE authenticated;
 SET request.jwt.claim.sub = '10000000-0000-4000-8000-000000000001';
