@@ -77,7 +77,7 @@ class _InventoryHistoryScreenState extends State<InventoryHistoryScreen> {
       );
     }
     return Scaffold(
-      appBar: AppBar,
+      appBar: AppBar(
         title: const Text('تاریخچه گردش انبار'),
         actions: [
           IconButton(
